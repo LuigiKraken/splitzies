@@ -10,7 +10,6 @@
       lastDragPoint: null,
       dragPreviewTimer: null,
       previewIdleTimer: null,
-      dragVisualState: "hitbox",
       hoverAnchorPoint: null
     };
 
@@ -36,10 +35,6 @@
 
     function getLastDragPoint() {
       return state.lastDragPoint;
-    }
-
-    function setDragVisualState(value) {
-      state.dragVisualState = value;
     }
 
     function setHoverAnchorPoint(value) {
@@ -87,7 +82,6 @@
       state.hoverPreview = null;
       state.lastDragPoint = null;
       state.hoverAnchorPoint = null;
-      state.dragVisualState = "hitbox";
       stopDragPreviewTimer();
       stopPreviewIdleTimer();
     }
@@ -103,7 +97,6 @@
       getHoverPreview,
       setLastDragPoint,
       getLastDragPoint,
-      setDragVisualState,
       setHoverAnchorPoint,
       stopPreviewIdleTimer,
       stopDragPreviewTimer,

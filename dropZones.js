@@ -94,14 +94,6 @@
     return [{ x: right, y: top }, { x: right, y: bottom }, { x: cx, y: cy }];
   }
 
-  function getDirectionalBandPolygon(bounds, layer, totalLayers, direction) {
-    if (layer < 1 || totalLayers < 1) return [];
-    const ring = 1 / totalLayers;
-    const inner = (layer - 1) * ring;
-    const outer = layer * ring;
-    return getDirectionalBandPolygonByRatio(bounds, direction, inner, outer);
-  }
-
   function getDirectionalBandPolygonByRatio(bounds, direction, innerRatio, outerRatio) {
     const inner = clamp(innerRatio, 0, 1);
     const outer = clamp(outerRatio, 0, 1);
@@ -270,20 +262,6 @@
         count = layer;
       }
       return count;
-    }
-
-    function getInteractionBounds(panelBounds, tabsBounds) {
-      if (!tabsBounds) return panelBounds;
-      const panelBottom = panelBounds.top + panelBounds.height;
-      const maxTop = Math.min(panelBottom, Math.max(panelBounds.top, tabsBounds.top + tabsBounds.height));
-      const nextHeight = panelBottom - maxTop;
-      if (nextHeight < config.minBandPx * 2) return panelBounds;
-      return {
-        left: panelBounds.left,
-        top: maxTop,
-        width: panelBounds.width,
-        height: nextHeight
-      };
     }
 
     function canHostPanelWithinBounds(bounds) {

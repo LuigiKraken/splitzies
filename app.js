@@ -1,20 +1,11 @@
-const DEFAULT_CONFIG = {
-  centerFraction: 0.24,
-  minBandPx: 12,
-  maxDepth: 6,
-  minBoxWidthPx: 56,
-  minBoxHeightPx: 56,
-  maxTotalBoxCount: 30,
-  maxHorizontalStack: 6,
-  maxVerticalStack: 6,
-  previewIdleMs: 300,
-  previewMoveThresholdPx: 4,
-  betweenSiblingHitSlopPx: 10,
-  defaultPreviewMode: "preview",
-  persistLayout: true,
-  allowTabStripStackZone: false,
-  resizeSnapLevels: 8
-};
+const DEFAULT_CONFIG = window.DOCK_CONFIG;
+if (!DEFAULT_CONFIG || typeof DEFAULT_CONFIG !== "object") {
+  throw new Error("Missing DOCK_CONFIG. Ensure config.js is loaded before app.js.");
+}
+const CONFIG_OVERRIDE = (window.DOCK_CONFIG_OVERRIDE && typeof window.DOCK_CONFIG_OVERRIDE === "object")
+  ? window.DOCK_CONFIG_OVERRIDE
+  : null;
+const RAW_CONFIG = CONFIG_OVERRIDE ? { ...DEFAULT_CONFIG, ...CONFIG_OVERRIDE } : DEFAULT_CONFIG;
 const VIEW_MODES = ["hitbox", "preview", "combined"];
 
 function asPositiveNumber(value, fallback) {
@@ -60,7 +51,7 @@ function normalizeConfig(raw) {
   };
 }
 
-const CONFIG = normalizeConfig(window.DOCK_CONFIG);
+const CONFIG = normalizeConfig(RAW_CONFIG);
 const layoutModel = window.LayoutModel;
 if (!layoutModel) {
   throw new Error("Missing LayoutModel. Ensure layoutModel.js is loaded before app.js.");
@@ -542,7 +533,6 @@ function showDropPreview(zone) {
   previewLayer.classList.toggle("combined-tone", previewMode === "combined");
   previewLayer.classList.add("active");
   workspaceEl.classList.add("previewing");
-  dragController.setDragVisualState("preview");
 }
 
 function scheduleIdlePreview() {
@@ -570,7 +560,6 @@ function scheduleIdlePreview() {
 
 function showHitboxStateAtPoint(x, y) {
   clearDropPreviewLayer();
-  dragController.setDragVisualState("hitbox");
   dragController.setHoverPreview(null);
   clearDragOverlay();
   const panelInfoMap = buildPanelInfoMap(root);
@@ -599,7 +588,6 @@ function handlePreviewModeDragOver(x, y) {
 
 function showPreviewSearchStateAtPoint(x, y) {
   clearDropPreviewLayer();
-  dragController.setDragVisualState("preview");
   dragController.setHoverPreview(null);
   clearDragOverlay();
   const panelInfoMap = buildPanelInfoMap(root);
@@ -746,7 +734,6 @@ function startDragSession(sourcePanelId, tab, point, statusMessage) {
   moveDragGhost(point);
   dragController.setHoverPreview(null);
   setLastDragPoint(point);
-  dragController.setDragVisualState("hitbox");
   dragController.setHoverAnchorPoint(null);
   dragController.stopPreviewIdleTimer();
   dragController.stopDragPreviewTimer();
@@ -1129,7 +1116,6 @@ viewModeBtn.addEventListener("click", () => {
   if (dragCtx && lastDragPoint) {
     dragController.stopPreviewIdleTimer();
     dragController.setHoverAnchorPoint(lastDragPoint);
-    dragController.setDragVisualState("hitbox");
     clearDropPreviewLayer();
     if (previewMode === "preview") {
       showPreviewSearchStateAtPoint(lastDragPoint.x, lastDragPoint.y);
