@@ -202,6 +202,37 @@
       getNodeElementById
     } = deps;
 
+    function isDirectionalLayerReachable(info, ancestorIndex, direction) {
+      if (!info || !Array.isArray(info.ancestors) || ancestorIndex <= 0) return true;
+      const insertBefore = isBeforeDirection(direction);
+      // Only intermediate along-axis containers gate reachability to deeper layers.
+      // The target ancestor itself remains reachable even when the child is not at
+      // the extreme edge (that allows valid "insert before/after this child").
+      for (let i = 1; i < ancestorIndex; i += 1) {
+        const container = info.ancestors[i];
+        const childSubtree = info.ancestors[i - 1];
+        if (!container || container.type !== "container" || !childSubtree) return false;
+        if (!isAlongAxis(container.axis, direction)) continue;
+        const childIdx = container.children.findIndex((c) => c.id === childSubtree.id);
+        if (childIdx === -1) return false;
+        if (insertBefore) {
+          if (childIdx !== 0) return false;
+        } else if (childIdx !== container.children.length - 1) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function getReachableDirectionalLayerCount(info, totalLayers, direction) {
+      let count = 0;
+      for (let layer = 1; layer <= totalLayers; layer += 1) {
+        if (!isDirectionalLayerReachable(info, layer - 1, direction)) break;
+        count = layer;
+      }
+      return count;
+    }
+
     function getInteractionBounds(panelBounds, tabsBounds) {
       if (!tabsBounds) return panelBounds;
       const panelBottom = panelBounds.top + panelBounds.height;
@@ -335,73 +366,6 @@
       };
     }
 
-    function buildHitZoneDescriptors(panelEl, info) {
-      const panelBounds = panelEl.getBoundingClientRect();
-      const descriptors = [];
-
-      const tabsEl = panelEl.querySelector(".tabs");
-      if (tabsEl && config.allowTabStripStackZone) {
-        const tabsBounds = tabsEl.getBoundingClientRect();
-        descriptors.push({
-          key: "stack-tabs",
-          layer: 0,
-          direction: null,
-          geometry: { kind: "rect", bounds: tabsBounds },
-          zone: {
-            layer: 0,
-            direction: null,
-            type: "STACK",
-            panelId: info.panel.id,
-            targetId: info.panel.id,
-            reason: "Tab strip zone"
-          },
-          hit: (x, y) => pointInRect(x, y, tabsBounds)
-        });
-      }
-
-      const centerRect = getCenterRect(panelBounds, config);
-      descriptors.push({
-        key: "stack-center",
-        layer: 0,
-        direction: null,
-        geometry: { kind: "rect", bounds: centerRect },
-        zone: {
-          layer: 0,
-          direction: null,
-          type: "STACK",
-          panelId: info.panel.id,
-          targetId: info.panel.id,
-          reason: "Center zone"
-        },
-        hit: (x, y) => pointInRect(x, y, centerRect)
-      });
-
-      const totalLayers = getEffectiveLayerCount(panelBounds, info.depth, config);
-      const directions = ["TOP", "BOTTOM", "LEFT", "RIGHT"];
-      for (let layer = 1; layer <= totalLayers; layer += 1) {
-        for (const direction of directions) {
-          const poly = getDirectionalBandPolygon(panelBounds, layer, totalLayers, direction);
-          if (!poly || poly.length < 3) continue;
-          const zone = resolveDirectionalZone(info, panelBounds, layer, direction);
-          descriptors.push({
-            key: `layer-${layer}-${direction}`,
-            layer,
-            direction,
-            geometry: {
-              kind: "polygon",
-              bounds: panelBounds,
-              points: poly,
-              clipPath: polygonToClipPath(panelBounds, poly)
-            },
-            zone,
-            hit: (x, y) => pointInPolygon(x, y, poly)
-          });
-        }
-      }
-
-      return descriptors;
-    }
-
     function buildDisplayZoneDescriptors(panelEl, info) {
       const panelBounds = panelEl.getBoundingClientRect();
       const descriptors = [];
@@ -421,7 +385,8 @@
             panelId: info.panel.id,
             targetId: info.panel.id,
             reason: "Tab strip zone"
-          }
+          },
+          hit: (x, y) => pointInRect(x, y, tabsBounds)
         });
       }
 
@@ -439,18 +404,20 @@
           panelId: info.panel.id,
           targetId: info.panel.id,
           reason: "Center zone"
-        }
+        },
+        hit: (x, y) => pointInRect(x, y, centerRect)
       });
 
       const directionalStartRatio = clamp(config.centerFraction, 0, 0.95);
       const totalLayers = getEffectiveLayerCount(interactionBounds, info.depth, config);
       const directions = ["TOP", "BOTTOM", "LEFT", "RIGHT"];
-      for (let layer = 1; layer <= totalLayers; layer += 1) {
-        for (const direction of directions) {
+      for (const direction of directions) {
+        const reachableLayerCount = getReachableDirectionalLayerCount(info, totalLayers, direction);
+        for (let layer = 1; layer <= reachableLayerCount; layer += 1) {
           const poly = getDisplayDirectionalBandPolygon(
             interactionBounds,
             layer,
-            totalLayers,
+            reachableLayerCount,
             direction,
             directionalStartRatio
           );
@@ -465,7 +432,8 @@
               points: poly,
               clipPath: polygonToClipPath(interactionBounds, poly)
             },
-            zone: resolveDirectionalZone(info, panelBounds, layer, direction)
+            zone: resolveDirectionalZone(info, panelBounds, layer, direction),
+            hit: (x, y) => pointInPolygon(x, y, poly)
           });
         }
       }
@@ -491,7 +459,7 @@
     }
 
     function hitTestZone(panelEl, panelInfo, x, y) {
-      const descriptors = buildHitZoneDescriptors(panelEl, panelInfo);
+      const descriptors = buildDisplayZoneDescriptors(panelEl, panelInfo);
       const hit = findZoneAtPoint(descriptors, x, y);
       return hit ? hit.zone : null;
     }
