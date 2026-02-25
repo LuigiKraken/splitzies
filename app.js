@@ -1,67 +1,9 @@
-const DEFAULT_CONFIG = window.DOCK_CONFIG;
-if (!DEFAULT_CONFIG || typeof DEFAULT_CONFIG !== "object") {
+const CONFIG = window.DOCK_CONFIG;
+if (!CONFIG || typeof CONFIG !== "object") {
   throw new Error("Missing DOCK_CONFIG. Ensure config.js is loaded before app.js.");
 }
-const CONFIG_OVERRIDE = (window.DOCK_CONFIG_OVERRIDE && typeof window.DOCK_CONFIG_OVERRIDE === "object")
-  ? window.DOCK_CONFIG_OVERRIDE
-  : null;
-const RAW_CONFIG = CONFIG_OVERRIDE ? { ...DEFAULT_CONFIG, ...CONFIG_OVERRIDE } : DEFAULT_CONFIG;
 const VIEW_MODES = ["hitbox", "preview", "combined"];
 
-const asPositiveNumber = (value, fallback) =>
-  Number.isFinite(value) && value > 0 ? value : fallback;
-
-const asPositiveInt = (value, fallback) => {
-  const n = Number.parseInt(value, 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-};
-
-const asNumberInRange = (value, fallback, min, max) =>
-  Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
-
-const asFraction = (value, fallback, min = 0.01, max = 1) => {
-  if (!Number.isFinite(value)) return fallback;
-  const normalized = value > 1 && value <= 100 ? value / 100 : value;
-  return Math.max(min, Math.min(max, normalized));
-};
-
-const asBoolean = (value, fallback) =>
-  typeof value === "boolean" ? value : fallback;
-
-const asStringEnum = (value, fallback, allowedValues) =>
-  typeof value === "string" && allowedValues.includes(value) ? value : fallback;
-
-const resolveSizeFraction = (inputFraction, fallbackFraction) =>
-  asFraction(inputFraction, asFraction(fallbackFraction, fallbackFraction));
-
-function normalizeConfig(raw) {
-  const input = (raw && typeof raw === "object") ? raw : {};
-  return {
-    centerFraction: asNumberInRange(input.centerFraction, DEFAULT_CONFIG.centerFraction, 0.01, 0.95),
-    minBandPx: asPositiveNumber(input.minBandPx, DEFAULT_CONFIG.minBandPx),
-    maxDepth: asPositiveInt(input.maxDepth, DEFAULT_CONFIG.maxDepth),
-    minBoxWidthFraction: resolveSizeFraction(input.minBoxWidthFraction, DEFAULT_CONFIG.minBoxWidthFraction),
-    minBoxHeightFraction: resolveSizeFraction(input.minBoxHeightFraction, DEFAULT_CONFIG.minBoxHeightFraction),
-    maxTotalBoxCount: asPositiveInt(input.maxTotalBoxCount, DEFAULT_CONFIG.maxTotalBoxCount),
-    maxHorizontalStack: asPositiveInt(input.maxHorizontalStack, DEFAULT_CONFIG.maxHorizontalStack),
-    maxVerticalStack: asPositiveInt(input.maxVerticalStack, DEFAULT_CONFIG.maxVerticalStack),
-    previewIdleMs: asPositiveInt(input.previewIdleMs, DEFAULT_CONFIG.previewIdleMs),
-    previewMoveThresholdPx: asPositiveNumber(input.previewMoveThresholdPx, DEFAULT_CONFIG.previewMoveThresholdPx),
-    betweenSiblingHitSlopPx: asPositiveNumber(input.betweenSiblingHitSlopPx, DEFAULT_CONFIG.betweenSiblingHitSlopPx),
-    defaultPreviewMode: asStringEnum(input.defaultPreviewMode, DEFAULT_CONFIG.defaultPreviewMode, VIEW_MODES),
-    persistLayout: asBoolean(input.persistLayout, DEFAULT_CONFIG.persistLayout),
-    dropTransitionMs: asPositiveInt(input.dropTransitionMs, DEFAULT_CONFIG.dropTransitionMs),
-    previewTransitionMs: asPositiveInt(input.previewTransitionMs, DEFAULT_CONFIG.previewTransitionMs),
-    allowTabStripStackZone: asBoolean(input.allowTabStripStackZone, DEFAULT_CONFIG.allowTabStripStackZone),
-    tabStripStackZoneMinHeightFraction: resolveSizeFraction(
-      input.tabStripStackZoneMinHeightFraction,
-      DEFAULT_CONFIG.tabStripStackZoneMinHeightFraction
-    ),
-    resizeSnapLevels: asPositiveInt(input.resizeSnapLevels, DEFAULT_CONFIG.resizeSnapLevels)
-  };
-}
-
-const CONFIG = normalizeConfig(RAW_CONFIG);
 const layoutModel = window.LayoutModel;
 if (!layoutModel) {
   throw new Error("Missing LayoutModel. Ensure layoutModel.js is loaded before app.js.");
@@ -85,8 +27,6 @@ let panelCounter = 1;
 let root = createPanelNode(createBoxTab());
 let activePanelId = root.id;
 const DEFAULT_PREVIEW_MODE = CONFIG.defaultPreviewMode;
-const STORAGE_SCHEMA_VERSION = 1;
-const LAYOUT_STORAGE_KEY = `dock-layout-state-v${STORAGE_SCHEMA_VERSION}`;
 let previewMode = DEFAULT_PREVIEW_MODE;
 
 const CREATE_BUTTON_HOLD_MS = 160;
@@ -115,8 +55,6 @@ let resizeController = null;
 
 const PREVIEW_IDLE_MS = CONFIG.previewIdleMs;
 const PREVIEW_MOVE_THRESHOLD_PX = CONFIG.previewMoveThresholdPx;
-const DROP_TRANSITION_MS = CONFIG.dropTransitionMs;
-const PREVIEW_TRANSITION_MS = CONFIG.previewTransitionMs;
 const dragControllerApi = window.DragController;
 if (!dragControllerApi) {
   throw new Error("Missing DragController. Ensure dragController.js is loaded before app.js.");
@@ -220,109 +158,6 @@ function makeNodeFactories(idSeed, panelSeed) {
   };
 }
 
-function isValidTab(tab) {
-  return !!tab
-    && typeof tab === "object"
-    && typeof tab.id === "string"
-    && Number.isFinite(tab.num)
-    && tab.num > 0;
-}
-
-function isValidNode(node) {
-  if (!node || typeof node !== "object" || typeof node.id !== "string") return false;
-  if (node.type === "panel") {
-    if (!Array.isArray(node.tabs) || node.tabs.length === 0) return false;
-    if (!node.tabs.every(isValidTab)) return false;
-    if (node.activeTabId !== null && typeof node.activeTabId !== "string") return false;
-    if (node.activeTabId && !node.tabs.some((tab) => tab.id === node.activeTabId)) return false;
-    return true;
-  }
-  if (node.type === "container") {
-    if (node.axis !== "row" && node.axis !== "column") return false;
-    if (!Array.isArray(node.children) || node.children.length === 0) return false;
-    if (!Array.isArray(node.sizes) || node.sizes.length !== node.children.length) return false;
-    if (!node.sizes.every((size) => Number.isFinite(size) && size > 0)) return false;
-    return node.children.every(isValidNode);
-  }
-  return false;
-}
-
-function extractTrailingIdNumber(id) {
-  if (typeof id !== "string") return 0;
-  const match = /-(\d+)$/.exec(id);
-  if (!match) return 0;
-  const value = Number.parseInt(match[1], 10);
-  return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function collectTreeStats(node, stats = { maxIdNumber: 0, maxBoxNumber: 0 }) {
-  stats.maxIdNumber = Math.max(stats.maxIdNumber, extractTrailingIdNumber(node.id));
-  if (node.type === "panel") {
-    for (const tab of node.tabs) {
-      stats.maxIdNumber = Math.max(stats.maxIdNumber, extractTrailingIdNumber(tab.id));
-      stats.maxBoxNumber = Math.max(stats.maxBoxNumber, tab.num);
-    }
-    return stats;
-  }
-  for (const child of node.children) {
-    collectTreeStats(child, stats);
-  }
-  return stats;
-}
-
-function safePositiveInt(value, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function persistLayoutState() {
-  if (!CONFIG.persistLayout) return;
-  try {
-    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify({
-      schemaVersion: STORAGE_SCHEMA_VERSION, root, activePanelId, previewMode, idCounter, panelCounter
-    }));
-  } catch (err) {}
-}
-
-function clearPersistedLayoutState() {
-  try { localStorage.removeItem(LAYOUT_STORAGE_KEY); } catch (err) {}
-}
-
-function restorePersistedLayoutState() {
-  if (!CONFIG.persistLayout) return false;
-  let parsed = null;
-  try {
-    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
-    if (!raw) return false;
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    return false;
-  }
-
-  if (!parsed || typeof parsed !== "object") return false;
-  if (parsed.schemaVersion !== STORAGE_SCHEMA_VERSION) return false;
-  if (!isValidNode(parsed.root)) return false;
-  if (!getFirstPanel(parsed.root)) return false;
-
-  root = parsed.root;
-  previewMode = VIEW_MODES.includes(parsed.previewMode) ? parsed.previewMode : DEFAULT_PREVIEW_MODE;
-  activePanelId = typeof parsed.activePanelId === "string" ? parsed.activePanelId : null;
-
-  const stats = collectTreeStats(root);
-  idCounter = Math.max(safePositiveInt(parsed.idCounter, 1), stats.maxIdNumber + 1);
-  panelCounter = Math.max(safePositiveInt(parsed.panelCounter, 1), stats.maxBoxNumber + 1);
-
-  const activeFound = activePanelId ? findNodeById(root, activePanelId) : null;
-  if (!activeFound || activeFound.node.type !== "panel") {
-    const firstPanel = getFirstPanel(root);
-    activePanelId = firstPanel ? firstPanel.id : null;
-  }
-
-  return true;
-}
-
-restorePersistedLayoutState();
-
 const axisStackLimit = (axis) =>
   axis === "column" ? CONFIG.maxHorizontalStack : CONFIG.maxVerticalStack;
 
@@ -332,6 +167,32 @@ const canAddSiblingToAxis = (axis, nextSiblingCount) =>
 const canCreateAnotherBox = () =>
   getTotalBoxCount(root) < CONFIG.maxTotalBoxCount;
 
+const persistenceApi = window.Persistence;
+if (!persistenceApi) {
+  throw new Error("Missing Persistence. Ensure persistence.js is loaded before app.js.");
+}
+const persistence = persistenceApi.create({
+  persistLayout: CONFIG.persistLayout,
+  defaultPreviewMode: DEFAULT_PREVIEW_MODE,
+  findNodeById,
+  getFirstPanel
+});
+
+function persistLayoutState() {
+  persistence.persistLayoutState({ root, activePanelId, previewMode, idCounter, panelCounter });
+}
+
+const clearPersistedLayoutState = () => persistence.clearPersistedLayoutState();
+
+(function restoreIfAvailable() {
+  const restored = persistence.restorePersistedLayoutState();
+  if (!restored) return;
+  root = restored.root;
+  activePanelId = restored.activePanelId;
+  previewMode = restored.previewMode;
+  idCounter = restored.idCounter;
+  panelCounter = restored.panelCounter;
+}());
 
 const dropZonesApi = window.DropZones;
 if (!dropZonesApi) {
@@ -401,6 +262,16 @@ const {
   }
 });
 
+const animationsApi = window.Animations;
+if (!animationsApi) {
+  throw new Error("Missing Animations. Ensure animations.js is loaded before app.js.");
+}
+const { animateDropTransition, animatePreviewTransition } = animationsApi.create({
+  workspaceEl,
+  dropTransitionMs: CONFIG.dropTransitionMs,
+  previewTransitionMs: CONFIG.previewTransitionMs
+});
+
 function renderAndPersist() {
   render();
   syncOverlayForCurrentMode();
@@ -412,6 +283,11 @@ function renderWithoutPersist() {
   syncOverlayForCurrentMode();
 }
 
+function renderAndPersistWithDropTransition(previousRects, enteredPanelId = null) {
+  renderAndPersist();
+  animateDropTransition(previousRects, enteredPanelId);
+}
+
 function capturePanelRects() {
   const rectMap = new Map();
   for (const panelEl of workspaceEl.querySelectorAll(".panel[data-panel-id]")) {
@@ -421,96 +297,6 @@ function capturePanelRects() {
     rectMap.set(panelId, { left: r.left, top: r.top, width: r.width, height: r.height });
   }
   return rectMap;
-}
-
-function clearTransitionStyles(panelEl) {
-  panelEl.style.transition = "";
-  panelEl.style.transform = "";
-  panelEl.style.transformOrigin = "";
-  panelEl.style.opacity = "";
-  panelEl.style.willChange = "";
-}
-
-// Shared FLIP animation core used by both drop and preview transitions.
-// containerEl  - element whose .panel children to animate
-// previousRects - Map of panelId -> rect captured before the DOM change
-// transitionMs  - duration
-// isPreview    - true = preview layer behaviour (fade-in new panels, animate opacity)
-// enteredPanelId - (drop only) id of newly created panel to flash-enter
-function animatePanelTransition(containerEl, previousRects, transitionMs, isPreview, enteredPanelId) {
-  if (!previousRects || previousRects.size === 0) return;
-  const panelEls = Array.from(containerEl.querySelectorAll(".panel[data-panel-id]"));
-  if (panelEls.length === 0) return;
-
-  const movingPanels = [];
-  const epsilonPx = 0.5;
-
-  for (const panelEl of panelEls) {
-    const panelId = panelEl.dataset.panelId;
-    if (!panelId) continue;
-    const oldRect = previousRects.get(panelId);
-    const newRect = panelEl.getBoundingClientRect();
-
-    if (!oldRect) {
-      if (isPreview) {
-        panelEl.style.opacity = "0.55";
-        panelEl.style.transform = "scale(0.92)";
-        panelEl.style.transition = "none";
-        panelEl.style.willChange = "transform, opacity";
-        movingPanels.push(panelEl);
-      } else if (enteredPanelId && panelId === enteredPanelId) {
-        panelEl.classList.add("drop-panel-enter");
-        window.setTimeout(() => panelEl.classList.remove("drop-panel-enter"), transitionMs + 30);
-      }
-      continue;
-    }
-
-    if (newRect.width <= 0 || newRect.height <= 0) continue;
-
-    const dx = oldRect.left - newRect.left;
-    const dy = oldRect.top - newRect.top;
-    const sx = oldRect.width / newRect.width;
-    const sy = oldRect.height / newRect.height;
-    if (Math.abs(dx) <= epsilonPx && Math.abs(dy) <= epsilonPx
-        && Math.abs(1 - sx) <= 0.01 && Math.abs(1 - sy) <= 0.01) continue;
-
-    clearTransitionStyles(panelEl);
-    panelEl.style.transition = "none";
-    panelEl.style.transformOrigin = "top left";
-    panelEl.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
-    panelEl.style.willChange = isPreview ? "transform, opacity" : "transform";
-    movingPanels.push(panelEl);
-  }
-
-  if (movingPanels.length === 0) return;
-
-  window.requestAnimationFrame(() => {
-    for (const panelEl of movingPanels) {
-      panelEl.style.transition = isPreview
-        ? `transform ${transitionMs}ms cubic-bezier(0.2, 0.78, 0.18, 1), opacity ${transitionMs}ms linear`
-        : `transform ${transitionMs}ms cubic-bezier(0.2, 0.78, 0.18, 1)`;
-      panelEl.style.transform = "translate(0px, 0px) scale(1, 1)";
-      if (isPreview) panelEl.style.opacity = "1";
-    }
-  });
-
-  window.setTimeout(() => {
-    for (const panelEl of movingPanels) clearTransitionStyles(panelEl);
-  }, transitionMs + 40);
-}
-
-function animateDropTransition(previousRects, enteredPanelId = null) {
-  animatePanelTransition(workspaceEl, previousRects, DROP_TRANSITION_MS, false, enteredPanelId);
-}
-
-function renderAndPersistWithDropTransition(previousRects, enteredPanelId = null) {
-  renderAndPersist();
-  animateDropTransition(previousRects, enteredPanelId);
-}
-
-function animatePreviewTransition(previewLayer, sourceRects) {
-  if (!previewLayer || !sourceRects || sourceRects.size === 0) return;
-  animatePanelTransition(previewLayer, sourceRects, PREVIEW_TRANSITION_MS, true, null);
 }
 
 const resizeControllerApi = window.ResizeController;
