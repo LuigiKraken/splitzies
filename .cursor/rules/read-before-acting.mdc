@@ -1,0 +1,13 @@
+---
+description: Require complete codebase context before decisions or edits
+alwaysApply: true
+---
+
+# Read Before Acting
+
+Before making assumptions, decisions, or modifications, read all relevant files in full and build a clear understanding of the existing codebase.
+
+- Do not infer architecture, intent, or behavior from partial context.
+- Examine dependencies, data flow, naming patterns, and surrounding logic to understand how components interact.
+- Base all reasoning and changes on the actual implementation, not assumptions.
+- Only propose solutions or modifications after forming a comprehensive and accurate understanding of the current system.

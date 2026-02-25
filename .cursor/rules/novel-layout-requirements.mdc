@@ -1,0 +1,15 @@
+---
+description: Enforce explicit requirements for the project's novel layout system
+alwaysApply: true
+---
+
+# Novel Layout Requirements
+
+This project uses a new, never-before-seen layout management solution.
+
+- Do not assume any standard UI/layout behavior or conventions.
+- Do not infer or "fill in" missing behavior based on common frameworks.
+- Treat all layout logic as undefined unless the user explicitly specifies it.
+- Ask for requirements whenever layout behavior is unclear.
+- Implement the novel layout solution exactly as the user specifies.
+- Prioritize explicit user instructions over best practices, defaults, or typical patterns.

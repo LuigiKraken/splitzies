@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docking Zone Mockup</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="toolbar">
+      <button id="createBtn" type="button">Create New Box</button>
+      <button id="resetBtn" type="button">Reset Layout</button>
+      <span>Drag a tab pill, then drop in center/edges/rings to <code>STACK</code>, <code>SPLIT</code>, <code>EQUALIZE</code>, <code>WRAP</code>. Edit <code>config.js</code> to tune limits.</span>
+      <span class="toolbar-spacer"></span>
+      <button id="viewModeBtn" type="button">Mode: Hitbox</button>
+    </div>
+
+    <div id="workspace" class="workspace"></div>
+
+    <div class="hud">
+      <div class="legend" id="status">
+        Ready. Create a box, then drag its tab to test zone behavior.
+      </div>
+      <div class="mono" id="treeView"></div>
+    </div>
+  </div>
+
+  <script src="./config.js"></script>
+  <script src="./layoutModel.js"></script>
+  <script src="./dropZones.js"></script>
+  <script src="./dropActions.js"></script>
+  <script src="./dragController.js"></script>
+  <script src="./render.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
