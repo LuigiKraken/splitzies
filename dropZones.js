@@ -99,6 +99,13 @@
     const ring = 1 / totalLayers;
     const inner = (layer - 1) * ring;
     const outer = layer * ring;
+    return getDirectionalBandPolygonByRatio(bounds, direction, inner, outer);
+  }
+
+  function getDirectionalBandPolygonByRatio(bounds, direction, innerRatio, outerRatio) {
+    const inner = clamp(innerRatio, 0, 1);
+    const outer = clamp(outerRatio, 0, 1);
+    if (outer <= inner) return [];
     const cx = bounds.left + bounds.width / 2;
     const cy = bounds.top + bounds.height / 2;
     const halfW = bounds.width / 2;
@@ -170,52 +177,7 @@
     const ring = (1 - safeStart) / totalLayers;
     const inner = safeStart + (layer - 1) * ring;
     const outer = safeStart + layer * ring;
-    const cx = bounds.left + bounds.width / 2;
-    const cy = bounds.top + bounds.height / 2;
-    const halfW = bounds.width / 2;
-    const halfH = bounds.height / 2;
-    const xOuterLeft = cx - outer * halfW;
-    const xOuterRight = cx + outer * halfW;
-    const yOuterTop = cy - outer * halfH;
-    const yOuterBottom = cy + outer * halfH;
-    const xInnerLeft = cx - inner * halfW;
-    const xInnerRight = cx + inner * halfW;
-    const yInnerTop = cy - inner * halfH;
-    const yInnerBottom = cy + inner * halfH;
-
-    if (direction === "TOP" && yInnerTop > yOuterTop) {
-      return [
-        { x: xOuterLeft, y: yOuterTop },
-        { x: xOuterRight, y: yOuterTop },
-        { x: xOuterRight, y: yInnerTop },
-        { x: xOuterLeft, y: yInnerTop }
-      ];
-    }
-    if (direction === "BOTTOM" && yOuterBottom > yInnerBottom) {
-      return [
-        { x: xOuterLeft, y: yInnerBottom },
-        { x: xOuterRight, y: yInnerBottom },
-        { x: xOuterRight, y: yOuterBottom },
-        { x: xOuterLeft, y: yOuterBottom }
-      ];
-    }
-    if (direction === "LEFT" && xInnerLeft > xOuterLeft && yInnerBottom > yInnerTop) {
-      return [
-        { x: xOuterLeft, y: yInnerTop },
-        { x: xInnerLeft, y: yInnerTop },
-        { x: xInnerLeft, y: yInnerBottom },
-        { x: xOuterLeft, y: yInnerBottom }
-      ];
-    }
-    if (direction === "RIGHT" && xOuterRight > xInnerRight && yInnerBottom > yInnerTop) {
-      return [
-        { x: xInnerRight, y: yInnerTop },
-        { x: xOuterRight, y: yInnerTop },
-        { x: xOuterRight, y: yInnerBottom },
-        { x: xInnerRight, y: yInnerBottom }
-      ];
-    }
-    return [];
+    return getDirectionalBandPolygonByRatio(bounds, direction, inner, outer);
   }
 
   function polygonToClipPath(bounds, poly) {
@@ -521,8 +483,7 @@
 
     function zonesMatch(a, b) {
       if (!a || !b) return false;
-      return a.layer === b.layer
-        && a.direction === b.direction
+    return a.direction === b.direction
         && a.type === b.type
         && a.panelId === b.panelId
         && a.targetId === b.targetId
@@ -535,49 +496,56 @@
       return hit ? hit.zone : null;
     }
 
-    function drawZonesForHoveredPanel(panelEl, info, selectedZone) {
+    function drawZonesForWorkspace(panelInfoMap, selectedZone, hoveredPanelId = null) {
       const overlay = document.getElementById("workspaceOverlay");
       if (!overlay) return;
       overlay.innerHTML = "";
       workspaceEl.querySelectorAll(".panel.drag-hover").forEach((p) => p.classList.remove("drag-hover"));
-      panelEl.classList.add("drag-hover");
       const hasSelection = !!selectedZone;
-
       const overlayRect = overlay.getBoundingClientRect();
-      const descriptors = buildDisplayZoneDescriptors(panelEl, info);
-      for (const descriptor of descriptors) {
-        const { geometry, zone } = descriptor;
-        const zoneEl = document.createElement("div");
-        zoneEl.className = zone.layer === 0 ? "zone center-guide" : "zone";
+      for (const [panelId, info] of panelInfoMap.entries()) {
+        const panelEl = workspaceEl.querySelector(`.panel[data-panel-id="${panelId}"]`);
+        if (!panelEl) continue;
+        if (hoveredPanelId && hoveredPanelId === panelId) {
+          panelEl.classList.add("drag-hover");
+        }
+        const descriptors = buildDisplayZoneDescriptors(panelEl, info);
+        for (const descriptor of descriptors) {
+          const { geometry, zone } = descriptor;
+          const zoneEl = document.createElement("div");
+          zoneEl.className = zone.layer === 0 ? "zone center-guide" : "zone";
 
-        if (geometry.kind === "rect") {
           zoneEl.style.left = `${geometry.bounds.left - overlayRect.left}px`;
           zoneEl.style.top = `${geometry.bounds.top - overlayRect.top}px`;
           zoneEl.style.width = `${geometry.bounds.width}px`;
           zoneEl.style.height = `${geometry.bounds.height}px`;
-          zoneEl.style.opacity = "0.68";
-        } else {
-          zoneEl.style.left = `${geometry.bounds.left - overlayRect.left}px`;
-          zoneEl.style.top = `${geometry.bounds.top - overlayRect.top}px`;
-          zoneEl.style.width = `${geometry.bounds.width}px`;
-          zoneEl.style.height = `${geometry.bounds.height}px`;
-          zoneEl.style.clipPath = geometry.clipPath;
-          zoneEl.style.opacity = "0.62";
-        }
+          if (geometry.kind === "polygon") {
+            zoneEl.style.clipPath = geometry.clipPath;
+            zoneEl.style.opacity = "0.62";
+          } else {
+            zoneEl.style.opacity = "0.68";
+          }
 
-        zoneEl.style.background = actionColors[zone.type] || actionColors.INVALID;
-        const isSelected = selectedZone && zonesMatch(zone, selectedZone);
-        if (isSelected) {
-          zoneEl.classList.add("selected");
-        } else if (hasSelection) {
-          zoneEl.classList.add("dimmed");
+          zoneEl.style.background = actionColors[zone.type] || actionColors.INVALID;
+          const isSelected = selectedZone && zonesMatch(zone, selectedZone);
+          if (isSelected) {
+            zoneEl.classList.add("selected");
+          } else if (hasSelection) {
+            zoneEl.classList.add("dimmed");
+          }
+          overlay.appendChild(zoneEl);
         }
-        overlay.appendChild(zoneEl);
       }
+    }
+
+    function drawZonesForHoveredPanel(panelEl, info, selectedZone) {
+      const infoMap = new Map([[info.panel.id, info]]);
+      drawZonesForWorkspace(infoMap, selectedZone, info.panel.id);
     }
 
     return {
       hitTestZone,
+      drawZonesForWorkspace,
       drawZonesForHoveredPanel
     };
   }

@@ -286,7 +286,7 @@ const dropZonesApi = window.DropZones;
 if (!dropZonesApi) {
   throw new Error("Missing DropZones. Ensure dropZones.js is loaded before app.js.");
 }
-const { hitTestZone, drawZonesForHoveredPanel } = dropZonesApi.create({
+const { hitTestZone, drawZonesForWorkspace } = dropZonesApi.create({
   config: CONFIG,
   canAddSiblingToAxis,
   axisForDirection,
@@ -585,6 +585,7 @@ function cleanupDragUI(message = null, shouldRender = false) {
 
 function updateHoverFromPoint(x, y) {
   if (!getDragCtx()) return;
+  const panelInfoMap = buildPanelInfoMap(root);
   const hover = resolveHoverFromPoint(x, y);
   if (!hover) {
     dragController.setHoverPreview(null);
@@ -594,7 +595,7 @@ function updateHoverFromPoint(x, y) {
   }
 
   dragController.setHoverPreview({ panelId: hover.panelId, depth: hover.info.depth, zone: hover.zone });
-  drawZonesForHoveredPanel(hover.panelEl, hover.info, hover.zone);
+  drawZonesForWorkspace(panelInfoMap, hover.zone, hover.panelId);
 
   if (hover.zone) {
     if (hover.zone.type === "INVALID") {
