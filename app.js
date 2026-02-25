@@ -286,7 +286,7 @@ const dropZonesApi = window.DropZones;
 if (!dropZonesApi) {
   throw new Error("Missing DropZones. Ensure dropZones.js is loaded before app.js.");
 }
-const { hitTestZone, drawZonesForWorkspace } = dropZonesApi.create({
+const { resolveHoverAtPoint, drawZonesForWorkspace } = dropZonesApi.create({
   config: CONFIG,
   canAddSiblingToAxis,
   axisForDirection,
@@ -294,28 +294,43 @@ const { hitTestZone, drawZonesForWorkspace } = dropZonesApi.create({
   isBeforeDirection,
   workspaceEl,
   actionColors,
-  getNodeElementById: (id) => document.querySelector(`[data-node-id="${id}"]`)
+  getNodeElementById: (id) => document.querySelector(`[data-node-id="${id}"]`),
+  getRoot: () => root,
+  findNodeById
 });
 
 const dropActionsApi = window.DropActions;
 if (!dropActionsApi) {
   throw new Error("Missing DropActions. Ensure dropActions.js is loaded before app.js.");
 }
-const { executeDrop } = dropActionsApi.create({
+function createDropExecutor(runtime) {
+  return dropActionsApi.create({
+    getRoot: runtime.getRoot,
+    setRoot: runtime.setRoot,
+    setActivePanelId: runtime.setActivePanelId,
+    cloneNode,
+    findNodeById,
+    removePanelAndCollapse,
+    canCreateAnotherBox: runtime.canCreateAnotherBox,
+    createBoxTab: runtime.createBoxTab,
+    createPanelNode: runtime.createPanelNode,
+    createContainer: runtime.createContainer,
+    createFallbackRoot: runtime.createFallbackRoot,
+    axisForDirection,
+    isBeforeDirection,
+    clamp: (v, min, max) => Math.max(min, Math.min(max, v))
+  });
+}
+
+const { executeDrop } = createDropExecutor({
   getRoot: () => root,
   setRoot: (nextRoot) => { root = nextRoot; },
   setActivePanelId: (panelId) => { activePanelId = panelId; },
-  cloneNode,
-  findNodeById,
-  removePanelAndCollapse,
   canCreateAnotherBox,
   createBoxTab,
   createPanelNode,
   createContainer,
-  createFallbackRoot: () => createPanelNode(createBoxTab()),
-  axisForDirection,
-  isBeforeDirection,
-  clamp: (v, min, max) => Math.max(min, Math.min(max, v))
+  createFallbackRoot: () => createPanelNode(createBoxTab())
 });
 
 const rendererApi = window.DockRenderer;
@@ -383,125 +398,51 @@ function getTransparentDragImage() {
   return transparentDragImageEl;
 }
 
-function resolveHoverFromPoint(x, y) {
-  const panelInfoMap = buildPanelInfoMap(root);
-  const hovered = document.elementFromPoint(x, y);
-  const hoveredPanelEl = hovered ? hovered.closest(".panel[data-panel-id]") : null;
-  if (hoveredPanelEl && workspaceEl.contains(hoveredPanelEl)) {
-    const panelId = hoveredPanelEl.dataset.panelId;
-    const info = panelInfoMap.get(panelId);
-    if (info) {
-      const zone = hitTestZone(hoveredPanelEl, info, x, y);
-      // Preserve default behavior: when hovering a panel, still return it even
-      // if this exact point is in a no-op area so overlays remain visible.
-      return { panelEl: hoveredPanelEl, panelId, info, zone };
-    }
-  }
-
-  // Fallback for pointer positions in container gaps: directional ancestor zones
-  // can still be valid even when not directly over a panel element.
-  let best = null;
-  for (const [panelId, info] of panelInfoMap.entries()) {
-    const panelEl = workspaceEl.querySelector(`.panel[data-panel-id="${panelId}"]`);
-    if (!panelEl) continue;
-    const zone = hitTestZone(panelEl, info, x, y);
-    if (!zone) continue;
-    if (!best) {
-      best = { panelEl, panelId, info, zone };
-      continue;
-    }
-    const bestInvalid = best.zone.type === "INVALID";
-    const currentInvalid = zone.type === "INVALID";
-    if (bestInvalid !== currentInvalid) {
-      if (!currentInvalid) {
-        best = { panelEl, panelId, info, zone };
-      }
-      continue;
-    }
-    if (zone.layer < best.zone.layer) {
-      best = { panelEl, panelId, info, zone };
-    }
-  }
-
-  return best;
-}
-
-function resolveBetweenSiblingsZone(x, y) {
-  const containerEls = workspaceEl.querySelectorAll(".container[data-node-id]");
-  let best = null;
-  for (const containerEl of containerEls) {
-    const containerId = containerEl.dataset.nodeId;
-    const found = findNodeById(root, containerId);
-    if (!found || found.node.type !== "container") continue;
-    const containerNode = found.node;
-    if (containerNode.children.length < 2) continue;
-    if (!canAddSiblingToAxis(containerNode.axis, containerNode.children.length + 1)) continue;
-
-    const childEls = Array.from(containerEl.children).filter((el) => el.classList.contains("child"));
-    if (childEls.length < 2) continue;
-
-    for (let i = 0; i < childEls.length - 1; i += 1) {
-      const a = childEls[i].getBoundingClientRect();
-      const b = childEls[i + 1].getBoundingClientRect();
-      let nearBoundary = false;
-      let distance = Infinity;
-
-      if (containerNode.axis === "column") {
-        const overlapTop = Math.max(a.top, b.top);
-        const overlapBottom = Math.min(a.bottom, b.bottom);
-        if (overlapBottom <= overlapTop) continue;
-        const boundary = (a.right + b.left) / 2;
-        const minX = Math.min(a.right, b.left) - 10;
-        const maxX = Math.max(a.right, b.left) + 10;
-        nearBoundary = x >= minX && x <= maxX && y >= overlapTop && y <= overlapBottom;
-        distance = Math.abs(x - boundary);
-      } else {
-        const overlapLeft = Math.max(a.left, b.left);
-        const overlapRight = Math.min(a.right, b.right);
-        if (overlapRight <= overlapLeft) continue;
-        const boundary = (a.bottom + b.top) / 2;
-        const minY = Math.min(a.bottom, b.top) - 10;
-        const maxY = Math.max(a.bottom, b.top) + 10;
-        nearBoundary = y >= minY && y <= maxY && x >= overlapLeft && x <= overlapRight;
-        distance = Math.abs(y - boundary);
-      }
-
-      if (!nearBoundary) continue;
-      if (!best || distance < best.distance) {
-        best = {
-          distance,
-          zone: {
-            layer: 2,
-            direction: containerNode.axis === "column" ? "RIGHT" : "BOTTOM",
-            type: "EQUALIZE",
-            targetId: containerNode.id,
-            insertIndex: i + 1,
-            reason: "Between sibling panels"
-          }
-        };
-      }
-    }
-  }
-  return best ? best.zone : null;
-}
-
 function buildDropPreviewTree(zone) {
   const dragCtx = getDragCtx();
   if (!dragCtx || !zone) return null;
-  const savedRoot = root;
-  const savedIdCounter = idCounter;
-  const savedPanelCounter = panelCounter;
-  let previewTree = null;
-  try {
-    root = cloneNode(savedRoot);
-    executeDrop(zone, dragCtx.tab, dragCtx.sourcePanelId);
-    previewTree = cloneNode(root);
-  } finally {
-    root = savedRoot;
-    idCounter = savedIdCounter;
-    panelCounter = savedPanelCounter;
-  }
-  return previewTree;
+
+  const previewState = {
+    root: cloneNode(root),
+    activePanelId
+  };
+  let previewIdCounter = idCounter;
+  let previewPanelCounter = panelCounter;
+  const nextPreviewId = (prefix) => `${prefix}-${previewIdCounter++}`;
+  const createPreviewBoxTab = () => ({
+    id: nextPreviewId("tab"),
+    num: previewPanelCounter++
+  });
+  const createPreviewPanelNode = (initialTab) => ({
+    type: "panel",
+    id: nextPreviewId("panel"),
+    tabs: [initialTab],
+    activeTabId: initialTab.id
+  });
+  const createPreviewContainer = (axis, children) => {
+    const size = 1 / children.length;
+    return {
+      type: "container",
+      id: nextPreviewId("container"),
+      axis,
+      sizes: children.map(() => size),
+      children
+    };
+  };
+
+  const { executeDrop: executePreviewDrop } = createDropExecutor({
+    getRoot: () => previewState.root,
+    setRoot: (nextRoot) => { previewState.root = nextRoot; },
+    setActivePanelId: (panelId) => { previewState.activePanelId = panelId; },
+    canCreateAnotherBox: () => getTotalBoxCount(previewState.root) < CONFIG.maxTotalBoxCount,
+    createBoxTab: createPreviewBoxTab,
+    createPanelNode: createPreviewPanelNode,
+    createContainer: createPreviewContainer,
+    createFallbackRoot: () => createPreviewPanelNode(createPreviewBoxTab())
+  });
+
+  executePreviewDrop(zone, dragCtx.tab, dragCtx.sourcePanelId);
+  return cloneNode(previewState.root);
 }
 
 function showDropPreview(zone) {
@@ -524,13 +465,18 @@ function scheduleIdlePreview() {
     const dragCtx = getDragCtx();
     const lastDragPoint = getLastDragPoint();
     if (!dragCtx || previewMode !== "preview" || !lastDragPoint) return;
-    const hover = resolveHoverFromPoint(lastDragPoint.x, lastDragPoint.y);
+    const panelInfoMap = buildPanelInfoMap(root);
+    const hover = resolveHoverAtPoint(panelInfoMap, lastDragPoint.x, lastDragPoint.y);
     if (!hover || !hover.zone) return;
     if (hover.zone.type === "INVALID") {
       statusEl.textContent = `Preview blocked: ${hover.zone.reason}`;
       return;
     }
-    dragController.setHoverPreview({ panelId: hover.panelId, depth: hover.info.depth, zone: hover.zone });
+    dragController.setHoverPreview({
+      panelId: hover.panelId || null,
+      depth: hover.info ? hover.info.depth : null,
+      zone: hover.zone
+    });
     clearDragOverlay();
     showDropPreview(hover.zone);
     statusEl.textContent = `Preview: ${formatZoneSummary(hover.zone, true)}. Hold still to inspect, move to continue searching.`;
@@ -542,7 +488,8 @@ function showHitboxStateAtPoint(x, y) {
   dragController.setDragVisualState("hitbox");
   dragController.setHoverPreview(null);
   clearDragOverlay();
-  const hover = resolveHoverFromPoint(x, y);
+  const panelInfoMap = buildPanelInfoMap(root);
+  const hover = resolveHoverAtPoint(panelInfoMap, x, y);
   if (!hover) {
     statusEl.textContent = "Move over a panel and hold still to see drop preview.";
     return;
@@ -586,7 +533,7 @@ function cleanupDragUI(message = null, shouldRender = false) {
 function updateHoverFromPoint(x, y) {
   if (!getDragCtx()) return;
   const panelInfoMap = buildPanelInfoMap(root);
-  const hover = resolveHoverFromPoint(x, y);
+  const hover = resolveHoverAtPoint(panelInfoMap, x, y);
   if (!hover) {
     dragController.setHoverPreview(null);
     clearDragOverlay();
@@ -594,7 +541,11 @@ function updateHoverFromPoint(x, y) {
     return;
   }
 
-  dragController.setHoverPreview({ panelId: hover.panelId, depth: hover.info.depth, zone: hover.zone });
+  dragController.setHoverPreview({
+    panelId: hover.panelId || null,
+    depth: hover.info ? hover.info.depth : null,
+    zone: hover.zone
+  });
   drawZonesForWorkspace(panelInfoMap, hover.zone, hover.panelId);
 
   if (hover.zone) {
@@ -755,18 +706,9 @@ function onPanelDrop(e) {
   e.preventDefault();
 
   const hoverPreview = getHoverPreview();
-  let zone = resolveBetweenSiblingsZone(e.clientX, e.clientY);
-  if (!zone) {
-    zone = hoverPreview && hoverPreview.zone ? hoverPreview.zone : null;
-  }
-  if (!zone) {
-    const panelEl = e.currentTarget;
-    const panelId = panelEl.dataset.panelId;
-    const panelInfoMap = buildPanelInfoMap(root);
-    const info = panelInfoMap.get(panelId);
-    if (!info) return;
-    zone = hitTestZone(panelEl, info, e.clientX, e.clientY);
-  }
+  const panelInfoMap = buildPanelInfoMap(root);
+  const hover = resolveHoverAtPoint(panelInfoMap, e.clientX, e.clientY);
+  const zone = (hoverPreview && hoverPreview.zone) || (hover && hover.zone) || null;
   if (!zone) {
     statusEl.textContent = "Drop canceled: no valid zone here.";
     return;
@@ -807,8 +749,9 @@ function onWorkspaceDrop(e) {
   e.preventDefault();
 
   const hoverPreview = getHoverPreview();
-  const zone = resolveBetweenSiblingsZone(e.clientX, e.clientY)
-    || (hoverPreview && hoverPreview.zone ? hoverPreview.zone : (resolveHoverFromPoint(e.clientX, e.clientY) || {}).zone);
+  const panelInfoMap = buildPanelInfoMap(root);
+  const hover = resolveHoverAtPoint(panelInfoMap, e.clientX, e.clientY);
+  const zone = (hoverPreview && hoverPreview.zone) || (hover && hover.zone) || null;
   if (!zone) {
     statusEl.textContent = "Drop canceled: no valid zone here.";
     return;
@@ -904,7 +847,8 @@ function finishCreateButtonPointer(point) {
   cancelCreateButtonPress();
   if (!wasDrag) return;
 
-  const hover = resolveHoverFromPoint(point.x, point.y);
+  const panelInfoMap = buildPanelInfoMap(root);
+  const hover = resolveHoverAtPoint(panelInfoMap, point.x, point.y);
   const dragCtx = getDragCtx();
   if (!hover || !hover.zone || !dragCtx) {
     cleanupDragUI("Create canceled: release over a valid panel zone to place the new box.", true);

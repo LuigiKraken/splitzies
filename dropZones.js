@@ -199,7 +199,9 @@
       isBeforeDirection,
       workspaceEl,
       actionColors,
-      getNodeElementById
+      getNodeElementById,
+      getRoot,
+      findNodeById
     } = deps;
 
     function isDirectionalLayerReachable(info, ancestorIndex, direction) {
@@ -451,6 +453,149 @@
       return matches[0];
     }
 
+    function chooseBetterZoneCandidate(current, next) {
+      if (!next) return current;
+      if (!current) return next;
+      const currentInvalid = current.zone.type === "INVALID";
+      const nextInvalid = next.zone.type === "INVALID";
+      if (currentInvalid !== nextInvalid) {
+        return nextInvalid ? current : next;
+      }
+      if (next.zone.layer < current.zone.layer) {
+        return next;
+      }
+      return current;
+    }
+
+    function buildBetweenSiblingsDescriptors() {
+      if (!getRoot || !findNodeById) return [];
+      const root = getRoot();
+      const descriptors = [];
+      const containerEls = workspaceEl.querySelectorAll(".container[data-node-id]");
+      for (const containerEl of containerEls) {
+        const containerId = containerEl.dataset.nodeId;
+        const found = findNodeById(root, containerId);
+        if (!found || found.node.type !== "container") continue;
+        const containerNode = found.node;
+        if (containerNode.children.length < 2) continue;
+        if (!canAddSiblingToAxis(containerNode.axis, containerNode.children.length + 1)) continue;
+
+        const childEls = Array.from(containerEl.children).filter((el) => el.classList.contains("child"));
+        if (childEls.length < 2) continue;
+
+        for (let i = 0; i < childEls.length - 1; i += 1) {
+          const a = childEls[i].getBoundingClientRect();
+          const b = childEls[i + 1].getBoundingClientRect();
+          const childNode = containerNode.children[i];
+          const childPanelId = childNode && childNode.type === "panel" ? childNode.id : null;
+
+          if (containerNode.axis === "column") {
+            const overlapTop = Math.max(a.top, b.top);
+            const overlapBottom = Math.min(a.bottom, b.bottom);
+            if (overlapBottom <= overlapTop) continue;
+            const boundary = (a.right + b.left) / 2;
+            const minX = Math.min(a.right, b.left) - 10;
+            const maxX = Math.max(a.right, b.left) + 10;
+            descriptors.push({
+              layer: 2,
+              direction: "RIGHT",
+              panelId: childPanelId,
+              zone: {
+                layer: 2,
+                direction: "RIGHT",
+                type: "EQUALIZE",
+                targetId: containerNode.id,
+                insertIndex: i + 1,
+                reason: "Between sibling panels"
+              },
+              hit: (x, y) => x >= minX && x <= maxX && y >= overlapTop && y <= overlapBottom,
+              distance: (x) => Math.abs(x - boundary)
+            });
+          } else {
+            const overlapLeft = Math.max(a.left, b.left);
+            const overlapRight = Math.min(a.right, b.right);
+            if (overlapRight <= overlapLeft) continue;
+            const boundary = (a.bottom + b.top) / 2;
+            const minY = Math.min(a.bottom, b.top) - 10;
+            const maxY = Math.max(a.bottom, b.top) + 10;
+            descriptors.push({
+              layer: 2,
+              direction: "BOTTOM",
+              panelId: childPanelId,
+              zone: {
+                layer: 2,
+                direction: "BOTTOM",
+                type: "EQUALIZE",
+                targetId: containerNode.id,
+                insertIndex: i + 1,
+                reason: "Between sibling panels"
+              },
+              hit: (x, y) => y >= minY && y <= maxY && x >= overlapLeft && x <= overlapRight,
+              distance: (_, y) => Math.abs(y - boundary)
+            });
+          }
+        }
+      }
+      return descriptors;
+    }
+
+    function findBetweenSiblingsZoneAtPoint(x, y) {
+      const descriptors = buildBetweenSiblingsDescriptors();
+      let best = null;
+      for (const descriptor of descriptors) {
+        if (!descriptor.hit(x, y)) continue;
+        const candidate = {
+          panelId: descriptor.panelId,
+          info: null,
+          zone: descriptor.zone,
+          metric: descriptor.distance(x, y)
+        };
+        if (!best || candidate.metric < best.metric) {
+          best = candidate;
+        }
+      }
+      return best;
+    }
+
+    function resolveHoverAtPoint(panelInfoMap, x, y) {
+      const hovered = document.elementFromPoint(x, y);
+      const hoveredPanelEl = hovered ? hovered.closest(".panel[data-panel-id]") : null;
+      if (hoveredPanelEl && workspaceEl.contains(hoveredPanelEl)) {
+        const panelId = hoveredPanelEl.dataset.panelId;
+        const info = panelInfoMap.get(panelId);
+        if (info) {
+          const zone = hitTestZone(hoveredPanelEl, info, x, y);
+          // Preserve default behavior: when hovering a panel, still return it even
+          // if this exact point is in a no-op area so overlays remain visible.
+          return { panelEl: hoveredPanelEl, panelId, info, zone };
+        }
+      }
+
+      let best = null;
+      for (const [panelId, info] of panelInfoMap.entries()) {
+        const panelEl = workspaceEl.querySelector(`.panel[data-panel-id="${panelId}"]`);
+        if (!panelEl) continue;
+        const zone = hitTestZone(panelEl, info, x, y);
+        if (!zone) continue;
+        best = chooseBetterZoneCandidate(best, { panelEl, panelId, info, zone });
+      }
+
+      const betweenSibling = findBetweenSiblingsZoneAtPoint(x, y);
+      if (betweenSibling) {
+        const panelEl = betweenSibling.panelId
+          ? workspaceEl.querySelector(`.panel[data-panel-id="${betweenSibling.panelId}"]`)
+          : null;
+        best = chooseBetterZoneCandidate(best, {
+          panelEl,
+          panelId: betweenSibling.panelId,
+          info: null,
+          zone: betweenSibling.zone
+        });
+      }
+
+      return best;
+    }
+
     function zonesMatch(a, b) {
       if (!a || !b) return false;
     return a.direction === b.direction
@@ -515,6 +660,7 @@
 
     return {
       hitTestZone,
+      resolveHoverAtPoint,
       drawZonesForWorkspace,
       drawZonesForHoveredPanel
     };
