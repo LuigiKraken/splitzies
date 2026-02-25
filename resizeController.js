@@ -71,7 +71,11 @@
     }
 
     function getMinSizePxForAxis(axis) {
-      return axis === "column" ? config.minBoxWidthPx : config.minBoxHeightPx;
+      const workspaceBounds = workspaceEl.getBoundingClientRect();
+      if (axis === "column") {
+        return Math.max(1, workspaceBounds.width * config.minBoxWidthFraction);
+      }
+      return Math.max(1, workspaceBounds.height * config.minBoxHeightFraction);
     }
 
     function buildResizePlanForDirection(root, panelInfo, direction) {

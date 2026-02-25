@@ -5,10 +5,10 @@ window.DOCK_CONFIG = {
   minBandPx: 12,
   // Max ancestor levels exposed as directional layers.
   maxDepth: 6,
-  // Minimum panel width in px for layout operations.
-  minBoxWidthPx: 56,
-  // Minimum panel height in px for layout operations.
-  minBoxHeightPx: 56,
+  // Minimum panel width as a fraction of workspace width (0.01..1).
+  minBoxWidthFraction: 0.08,
+  // Minimum panel height as a fraction of workspace height (0.01..1).
+  minBoxHeightFraction: 0.08,
   // Global cap on total boxes/tabs.
   maxTotalBoxCount: 30,
   // Max siblings in horizontal stacks (column axis).
@@ -33,8 +33,8 @@ window.DOCK_CONFIG = {
   previewTransitionMs: 90,
   // Allow stacking by dropping on tab strip.
   allowTabStripStackZone: true,
-  // Minimum panel height in px below which the tab strip stack zone is
+  // Minimum panel height fraction below which the tab strip stack zone is
   // suppressed to avoid conflicting with the center and directional zones.
-  // Should be above minBoxHeightPx but reachable via normal resizing.
-  tabStripStackZoneMinHeightPx: 80
+  // Should be above minBoxHeightFraction but reachable via normal resizing.
+  tabStripStackZoneMinHeightFraction: 0.12
 };

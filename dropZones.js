@@ -264,17 +264,36 @@
       return count;
     }
 
+    function getWorkspaceBounds() {
+      return workspaceEl.getBoundingClientRect();
+    }
+
+    function getMinPanelWidthPx() {
+      const bounds = getWorkspaceBounds();
+      return Math.max(1, bounds.width * config.minBoxWidthFraction);
+    }
+
+    function getMinPanelHeightPx() {
+      const bounds = getWorkspaceBounds();
+      return Math.max(1, bounds.height * config.minBoxHeightFraction);
+    }
+
+    function getTabStripStackZoneMinHeightPx() {
+      const bounds = getWorkspaceBounds();
+      return Math.max(1, bounds.height * config.tabStripStackZoneMinHeightFraction);
+    }
+
     function canHostPanelWithinBounds(bounds) {
-      return bounds.width >= config.minBoxWidthPx && bounds.height >= config.minBoxHeightPx;
+      return bounds.width >= getMinPanelWidthPx() && bounds.height >= getMinPanelHeightPx();
     }
 
     function canSplitBoundsIntoSiblings(bounds, axis, siblingCount) {
       if (!bounds || siblingCount < 1) return false;
       if (!canHostPanelWithinBounds(bounds)) return false;
       if (axis === "column") {
-        return (bounds.width / siblingCount) >= config.minBoxWidthPx;
+        return (bounds.width / siblingCount) >= getMinPanelWidthPx();
       }
-      return (bounds.height / siblingCount) >= config.minBoxHeightPx;
+      return (bounds.height / siblingCount) >= getMinPanelHeightPx();
     }
 
     function resolveDirectionalZone(info, panelBounds, layer, direction) {
@@ -451,7 +470,7 @@
       }
 
       if (tabsBounds && config.allowTabStripStackZone
-          && panelBounds.height >= config.tabStripStackZoneMinHeightPx) {
+          && panelBounds.height >= getTabStripStackZoneMinHeightPx()) {
         descriptors.push({
           key: "display-stack-tabs",
           layer: 0,

@@ -276,8 +276,8 @@ No single-child containers persist.
 
 The algorithm is theoretically unbounded but practically constrained:
 
-- **Minimum band width** (~20px) — skip outer layers that are too narrow to target.
-- **Minimum panel size** (~100px) — refuse further splitting below usable threshold.
+- **Minimum band width** (`minBandPx`) — skip outer layers that are too narrow to target.
+- **Minimum panel size** (`minBoxWidthFraction` / `minBoxHeightFraction`) — refuse further splitting below the configured workspace-size fractions.
 - **Maximum depth** (e.g. 6) — optional cap to prevent absurd nesting.
 
 These are implementation constraints only; the underlying logic is unchanged at any depth.

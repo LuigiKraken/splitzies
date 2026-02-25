@@ -22,6 +22,12 @@ function asNumberInRange(value, fallback, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function asFraction(value, fallback, min = 0.01, max = 1) {
+  if (!Number.isFinite(value)) return fallback;
+  const normalized = value > 1 && value <= 100 ? value / 100 : value;
+  return Math.max(min, Math.min(max, normalized));
+}
+
 function asBoolean(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
 }
@@ -30,14 +36,18 @@ function asStringEnum(value, fallback, allowedValues) {
   return typeof value === "string" && allowedValues.includes(value) ? value : fallback;
 }
 
+function resolveSizeFraction(inputFraction, fallbackFraction) {
+  return asFraction(inputFraction, asFraction(fallbackFraction, fallbackFraction));
+}
+
 function normalizeConfig(raw) {
   const input = (raw && typeof raw === "object") ? raw : {};
   return {
     centerFraction: asNumberInRange(input.centerFraction, DEFAULT_CONFIG.centerFraction, 0.01, 0.95),
     minBandPx: asPositiveNumber(input.minBandPx, DEFAULT_CONFIG.minBandPx),
     maxDepth: asPositiveInt(input.maxDepth, DEFAULT_CONFIG.maxDepth),
-    minBoxWidthPx: asPositiveInt(input.minBoxWidthPx, DEFAULT_CONFIG.minBoxWidthPx),
-    minBoxHeightPx: asPositiveInt(input.minBoxHeightPx, DEFAULT_CONFIG.minBoxHeightPx),
+    minBoxWidthFraction: resolveSizeFraction(input.minBoxWidthFraction, DEFAULT_CONFIG.minBoxWidthFraction),
+    minBoxHeightFraction: resolveSizeFraction(input.minBoxHeightFraction, DEFAULT_CONFIG.minBoxHeightFraction),
     maxTotalBoxCount: asPositiveInt(input.maxTotalBoxCount, DEFAULT_CONFIG.maxTotalBoxCount),
     maxHorizontalStack: asPositiveInt(input.maxHorizontalStack, DEFAULT_CONFIG.maxHorizontalStack),
     maxVerticalStack: asPositiveInt(input.maxVerticalStack, DEFAULT_CONFIG.maxVerticalStack),
@@ -49,7 +59,10 @@ function normalizeConfig(raw) {
     dropTransitionMs: asPositiveInt(input.dropTransitionMs, DEFAULT_CONFIG.dropTransitionMs),
     previewTransitionMs: asPositiveInt(input.previewTransitionMs, DEFAULT_CONFIG.previewTransitionMs),
     allowTabStripStackZone: asBoolean(input.allowTabStripStackZone, DEFAULT_CONFIG.allowTabStripStackZone),
-    tabStripStackZoneMinHeightPx: asPositiveNumber(input.tabStripStackZoneMinHeightPx, DEFAULT_CONFIG.tabStripStackZoneMinHeightPx),
+    tabStripStackZoneMinHeightFraction: resolveSizeFraction(
+      input.tabStripStackZoneMinHeightFraction,
+      DEFAULT_CONFIG.tabStripStackZoneMinHeightFraction
+    ),
     resizeSnapLevels: asPositiveInt(input.resizeSnapLevels, DEFAULT_CONFIG.resizeSnapLevels)
   };
 }
@@ -135,8 +148,13 @@ function setMaxBoxCountReachedStatus() {
 
 function applyRuntimeStyleConfig() {
   const rootStyle = document.documentElement.style;
-  rootStyle.setProperty("--min-box-width-px", `${CONFIG.minBoxWidthPx}px`);
-  rootStyle.setProperty("--min-box-height-px", `${CONFIG.minBoxHeightPx}px`);
+  const workspaceBounds = workspaceEl.getBoundingClientRect();
+  const workspaceWidth = workspaceBounds.width || window.innerWidth || 1;
+  const workspaceHeight = workspaceBounds.height || window.innerHeight || 1;
+  const minBoxWidthPx = Math.max(1, Math.round(workspaceWidth * CONFIG.minBoxWidthFraction));
+  const minBoxHeightPx = Math.max(1, Math.round(workspaceHeight * CONFIG.minBoxHeightFraction));
+  rootStyle.setProperty("--min-box-width-px", `${minBoxWidthPx}px`);
+  rootStyle.setProperty("--min-box-height-px", `${minBoxHeightPx}px`);
 }
 
 applyRuntimeStyleConfig();
@@ -857,6 +875,7 @@ function onWindowResize() {
   if (resizeFrameHandle) return;
   resizeFrameHandle = window.requestAnimationFrame(() => {
     resizeFrameHandle = null;
+    applyRuntimeStyleConfig();
     syncDragVisualsForResize();
   });
 }
