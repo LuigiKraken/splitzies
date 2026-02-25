@@ -87,7 +87,6 @@ html, body {
   cursor: ns-resize;
 }
 .panel.active-panel { outline: 2px solid #1d4ed8; outline-offset: -2px; }
-.panel.drag-hover { outline: 2px solid #333; outline-offset: -2px; }
 .resize-handle {
   position: absolute;
   border: 0;
@@ -271,14 +270,9 @@ html, body {
 .workspace-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 70; }
 .workspace-overlay .zone {
   position: absolute;
-  border: 1px solid rgba(0, 0, 0, 0.4);
-  transition: opacity 80ms linear, filter 80ms linear, outline-color 80ms linear, box-shadow 80ms linear;
+  transition: opacity 80ms linear, filter 80ms linear, box-shadow 80ms linear;
 }
-.workspace-overlay .zone.center-guide { border-style: dashed; }
 .workspace-overlay .zone.selected {
-  outline: 3px solid #000;
-  outline-offset: -1px;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.9);
   opacity: 0.92 !important;
   z-index: 2;
 }

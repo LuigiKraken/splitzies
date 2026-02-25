@@ -718,14 +718,11 @@
       for (const [panelId, info] of panelInfoMap.entries()) {
         const panelEl = workspaceEl.querySelector(`.panel[data-panel-id="${panelId}"]`);
         if (!panelEl) continue;
-        if (hoveredPanelId && hoveredPanelId === panelId) {
-          panelEl.classList.add("drag-hover");
-        }
         const descriptors = buildDisplayZoneDescriptors(panelEl, info);
         for (const descriptor of descriptors) {
           const { geometry, zone } = descriptor;
           const zoneEl = document.createElement("div");
-          zoneEl.className = zone.layer === 0 ? "zone center-guide" : "zone";
+          zoneEl.className = "zone";
 
           zoneEl.style.left = `${geometry.bounds.left - overlayRect.left}px`;
           zoneEl.style.top = `${geometry.bounds.top - overlayRect.top}px`;
@@ -752,7 +749,7 @@
 
     function drawZonesForHoveredPanel(panelEl, info, selectedZone) {
       const infoMap = new Map([[info.panel.id, info]]);
-      drawZonesForWorkspace(infoMap, selectedZone, info.panel.id);
+      drawZonesForWorkspace(infoMap, selectedZone);
     }
 
     return {
