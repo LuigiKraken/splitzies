@@ -1,5 +1,5 @@
 window.DOCK_CONFIG = {
-  // Fraction of the panel reserved for the center STACK zone (0..1).
+  // Fraction of the panel reserved for the center STACK zone (0.01..0.95).
   // Larger values make center stacking easier to hit; smaller values leave
   // more area for directional split/equalize/wrap zones.
   centerFraction: 0.24,
@@ -40,6 +40,16 @@ window.DOCK_CONFIG = {
   // Pointer movement threshold (px) treated as intentional motion during drag.
   // Helps filter micro-jitter so preview transitions feel stable.
   previewMoveThresholdPx: 4,
+
+  // Extra hit width (px) around boundaries between siblings for equalize drops.
+  betweenSiblingHitSlopPx: 10,
+
+  // Initial drag visualization mode when app starts or resets.
+  // Allowed: "hitbox" | "preview" | "combined"
+  defaultPreviewMode: "preview",
+
+  // Save/restore layout state from localStorage across reloads.
+  persistLayout: true,
 
   // Enables stacking by dropping directly on the tab strip.
   // Keep false for a rectangle-only model where stacking happens via center zone.

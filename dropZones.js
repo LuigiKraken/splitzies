@@ -494,8 +494,8 @@
             const overlapBottom = Math.min(a.bottom, b.bottom);
             if (overlapBottom <= overlapTop) continue;
             const boundary = (a.right + b.left) / 2;
-            const minX = Math.min(a.right, b.left) - 10;
-            const maxX = Math.max(a.right, b.left) + 10;
+            const minX = Math.min(a.right, b.left) - config.betweenSiblingHitSlopPx;
+            const maxX = Math.max(a.right, b.left) + config.betweenSiblingHitSlopPx;
             descriptors.push({
               layer: 2,
               direction: "RIGHT",
@@ -516,8 +516,8 @@
             const overlapRight = Math.min(a.right, b.right);
             if (overlapRight <= overlapLeft) continue;
             const boundary = (a.bottom + b.top) / 2;
-            const minY = Math.min(a.bottom, b.top) - 10;
-            const maxY = Math.max(a.bottom, b.top) + 10;
+            const minY = Math.min(a.bottom, b.top) - config.betweenSiblingHitSlopPx;
+            const maxY = Math.max(a.bottom, b.top) + config.betweenSiblingHitSlopPx;
             descriptors.push({
               layer: 2,
               direction: "BOTTOM",

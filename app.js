@@ -7,10 +7,14 @@ const DEFAULT_CONFIG = {
   maxTotalBoxCount: 30,
   maxHorizontalStack: 6,
   maxVerticalStack: 6,
-  previewIdleMs: 500,
+  previewIdleMs: 300,
   previewMoveThresholdPx: 4,
+  betweenSiblingHitSlopPx: 10,
+  defaultPreviewMode: "preview",
+  persistLayout: true,
   allowTabStripStackZone: false
 };
+const VIEW_MODES = ["hitbox", "preview", "combined"];
 
 function asPositiveNumber(value, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -21,14 +25,23 @@ function asPositiveInt(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+function asNumberInRange(value, fallback, min, max) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
+
 function asBoolean(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function asStringEnum(value, fallback, allowedValues) {
+  return typeof value === "string" && allowedValues.includes(value) ? value : fallback;
 }
 
 function normalizeConfig(raw) {
   const input = (raw && typeof raw === "object") ? raw : {};
   return {
-    centerFraction: asPositiveNumber(input.centerFraction, DEFAULT_CONFIG.centerFraction),
+    centerFraction: asNumberInRange(input.centerFraction, DEFAULT_CONFIG.centerFraction, 0.01, 0.95),
     minBandPx: asPositiveNumber(input.minBandPx, DEFAULT_CONFIG.minBandPx),
     maxDepth: asPositiveInt(input.maxDepth, DEFAULT_CONFIG.maxDepth),
     minBoxWidthPx: asPositiveInt(input.minBoxWidthPx, DEFAULT_CONFIG.minBoxWidthPx),
@@ -38,6 +51,9 @@ function normalizeConfig(raw) {
     maxVerticalStack: asPositiveInt(input.maxVerticalStack, DEFAULT_CONFIG.maxVerticalStack),
     previewIdleMs: asPositiveInt(input.previewIdleMs, DEFAULT_CONFIG.previewIdleMs),
     previewMoveThresholdPx: asPositiveNumber(input.previewMoveThresholdPx, DEFAULT_CONFIG.previewMoveThresholdPx),
+    betweenSiblingHitSlopPx: asPositiveNumber(input.betweenSiblingHitSlopPx, DEFAULT_CONFIG.betweenSiblingHitSlopPx),
+    defaultPreviewMode: asStringEnum(input.defaultPreviewMode, DEFAULT_CONFIG.defaultPreviewMode, VIEW_MODES),
+    persistLayout: asBoolean(input.persistLayout, DEFAULT_CONFIG.persistLayout),
     allowTabStripStackZone: asBoolean(input.allowTabStripStackZone, DEFAULT_CONFIG.allowTabStripStackZone)
   };
 }
@@ -65,11 +81,10 @@ let idCounter = 1;
 let panelCounter = 1;
 let root = createPanelNode(createBoxTab());
 let activePanelId = root.id;
-const DEFAULT_PREVIEW_MODE = "preview";
+const DEFAULT_PREVIEW_MODE = CONFIG.defaultPreviewMode;
 const STORAGE_SCHEMA_VERSION = 1;
 const LAYOUT_STORAGE_KEY = `dock-layout-state-v${STORAGE_SCHEMA_VERSION}`;
 let previewMode = DEFAULT_PREVIEW_MODE;
-const VIEW_MODES = ["hitbox", "preview", "combined"];
 
 const CREATE_BUTTON_HOLD_MS = 160;
 const CREATE_BUTTON_DRAG_START_PX = 6;
@@ -214,6 +229,7 @@ function safePositiveInt(value, fallback) {
 }
 
 function persistLayoutState() {
+  if (!CONFIG.persistLayout) return;
   const payload = {
     schemaVersion: STORAGE_SCHEMA_VERSION,
     root,
@@ -238,6 +254,7 @@ function clearPersistedLayoutState() {
 }
 
 function restorePersistedLayoutState() {
+  if (!CONFIG.persistLayout) return false;
   let parsed = null;
   try {
     const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
