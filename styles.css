@@ -76,8 +76,112 @@ html, body {
   grid-template-rows: auto 1fr auto;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
 }
+.workspace.resizing-layout,
+.workspace.resizing-layout * {
+  cursor: default !important;
+}
+.workspace[data-gap-resize-axis="column"] {
+  cursor: ew-resize;
+}
+.workspace[data-gap-resize-axis="row"] {
+  cursor: ns-resize;
+}
 .panel.active-panel { outline: 2px solid #1d4ed8; outline-offset: -2px; }
 .panel.drag-hover { outline: 2px solid #333; outline-offset: -2px; }
+.resize-handle {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 100ms ease;
+  z-index: 3;
+}
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  border: 1px solid rgba(100, 116, 139, 0.95);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  width: 12px;
+  height: 12px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.workspace[data-resize-affordance="cursor-only"] .resize-handle::after {
+  display: none;
+}
+.panel .resize-handle {
+  pointer-events: none;
+}
+.resize-top-left {
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize !important;
+}
+.resize-top-right {
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize !important;
+}
+.resize-bottom-left {
+  bottom: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize !important;
+}
+.resize-bottom-right {
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize !important;
+}
+.resize-top {
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 8px;
+  cursor: ns-resize !important;
+}
+.resize-right {
+  top: 16px;
+  right: 0;
+  bottom: 16px;
+  width: 8px;
+  cursor: ew-resize !important;
+}
+.resize-bottom {
+  bottom: 0;
+  left: 16px;
+  right: 16px;
+  height: 8px;
+  cursor: ns-resize !important;
+}
+.resize-left {
+  top: 16px;
+  left: 0;
+  bottom: 16px;
+  width: 8px;
+  cursor: ew-resize !important;
+}
+.panel.edge-top .resize-top,
+.panel.edge-right .resize-right,
+.panel.edge-bottom .resize-bottom,
+.panel.edge-left .resize-left,
+.panel.edge-top.edge-left .resize-top-left,
+.panel.edge-top.edge-right .resize-top-right,
+.panel.edge-bottom.edge-left .resize-bottom-left,
+.panel.edge-bottom.edge-right .resize-bottom-right {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
 .tabs {
   display: flex;
   gap: 6px;

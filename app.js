@@ -12,7 +12,8 @@ const DEFAULT_CONFIG = {
   betweenSiblingHitSlopPx: 10,
   defaultPreviewMode: "preview",
   persistLayout: true,
-  allowTabStripStackZone: false
+  allowTabStripStackZone: false,
+  resizeSnapLevels: 8
 };
 const VIEW_MODES = ["hitbox", "preview", "combined"];
 
@@ -54,7 +55,8 @@ function normalizeConfig(raw) {
     betweenSiblingHitSlopPx: asPositiveNumber(input.betweenSiblingHitSlopPx, DEFAULT_CONFIG.betweenSiblingHitSlopPx),
     defaultPreviewMode: asStringEnum(input.defaultPreviewMode, DEFAULT_CONFIG.defaultPreviewMode, VIEW_MODES),
     persistLayout: asBoolean(input.persistLayout, DEFAULT_CONFIG.persistLayout),
-    allowTabStripStackZone: asBoolean(input.allowTabStripStackZone, DEFAULT_CONFIG.allowTabStripStackZone)
+    allowTabStripStackZone: asBoolean(input.allowTabStripStackZone, DEFAULT_CONFIG.allowTabStripStackZone),
+    resizeSnapLevels: asPositiveInt(input.resizeSnapLevels, DEFAULT_CONFIG.resizeSnapLevels)
   };
 }
 
@@ -107,6 +109,7 @@ let suppressNextCreateClick = false;
 let dragGhostEl = null;
 let transparentDragImageEl = null;
 let resizeFrameHandle = null;
+let resizeController = null;
 
 const PREVIEW_IDLE_MS = CONFIG.previewIdleMs;
 const PREVIEW_MOVE_THRESHOLD_PX = CONFIG.previewMoveThresholdPx;
@@ -301,6 +304,31 @@ function canCreateAnotherBox() {
   return getTotalBoxCount(root) < CONFIG.maxTotalBoxCount;
 }
 
+function onResizeHandlePointerDown(e, panelId, corner) {
+  if (!resizeController) return;
+  resizeController.onResizeHandlePointerDown(e, panelId, corner);
+}
+
+function onWorkspacePointerDownForResize(e) {
+  if (!resizeController) return;
+  resizeController.onWorkspacePointerDown(e);
+}
+
+function onResizePointerMove(e) {
+  if (!resizeController) return;
+  resizeController.onResizePointerMove(e);
+}
+
+function onResizePointerUp(e) {
+  if (!resizeController) return;
+  resizeController.onResizePointerUp(e);
+}
+
+function onResizePointerCancel(e) {
+  if (!resizeController) return;
+  resizeController.onResizePointerCancel(e);
+}
+
 const dropZonesApi = window.DropZones;
 if (!dropZonesApi) {
   throw new Error("Missing DropZones. Ensure dropZones.js is loaded before app.js.");
@@ -377,7 +405,8 @@ const {
     onTabDragEnd,
     onPanelClick,
     onPanelDragOver,
-    onPanelDrop
+    onPanelDrop,
+    onResizeHandlePointerDown
   }
 });
 
@@ -386,6 +415,32 @@ function renderAndPersist() {
   syncOverlayForCurrentMode();
   persistLayoutState();
 }
+
+function renderWithoutPersist() {
+  render();
+  syncOverlayForCurrentMode();
+}
+
+const resizeControllerApi = window.ResizeController;
+if (!resizeControllerApi) {
+  throw new Error("Missing ResizeController. Ensure resizeController.js is loaded before app.js.");
+}
+resizeController = resizeControllerApi.create({
+  config: CONFIG,
+  workspaceEl,
+  statusEl,
+  getRoot: () => root,
+  setRoot: (nextRoot) => { root = nextRoot; },
+  setActivePanelId: (panelId) => { activePanelId = panelId; },
+  cloneNode,
+  buildPanelInfoMap,
+  findNodeById,
+  axisForDirection,
+  isBeforeDirection,
+  getDragCtx,
+  renderWithoutPersist,
+  renderAndPersist
+});
 
 function syncOverlayForCurrentMode() {
   if (getDragCtx()) return;
@@ -587,6 +642,11 @@ function updateViewModeButton() {
   }
   viewModeBtn.textContent = "Mode: Combined";
   viewModeBtn.setAttribute("aria-label", "Switch to hitbox mode");
+}
+
+function syncResizeAffordanceMode() {
+  const mode = previewMode === "hitbox" ? "circles" : "cursor-only";
+  workspaceEl.dataset.resizeAffordance = mode;
 }
 
 function cleanupDragUI(message = null, shouldRender = false) {
@@ -1042,6 +1102,9 @@ createBtn.addEventListener("click", () => {
 });
 
 resetBtn.addEventListener("click", () => {
+  if (resizeController) {
+    resizeController.cancelActiveResize();
+  }
   idCounter = 1;
   panelCounter = 1;
   root = createPanelNode(createBoxTab());
@@ -1050,6 +1113,7 @@ resetBtn.addEventListener("click", () => {
   dragController.resetDragSession();
   clearPersistedLayoutState();
   updateViewModeButton();
+  syncResizeAffordanceMode();
   statusEl.textContent = "Layout reset to one panel with one box.";
   renderAndPersist();
 });
@@ -1059,6 +1123,7 @@ viewModeBtn.addEventListener("click", () => {
   const safeIndex = modeIndex === -1 ? 0 : modeIndex;
   previewMode = VIEW_MODES[(safeIndex + 1) % VIEW_MODES.length];
   updateViewModeButton();
+  syncResizeAffordanceMode();
   const dragCtx = getDragCtx();
   const lastDragPoint = getLastDragPoint();
   if (dragCtx && lastDragPoint) {
@@ -1110,10 +1175,15 @@ window.addEventListener("drop", () => {
   if (!dragController.hasTransientState()) return;
   cleanupDragUI(null, true);
 });
+window.addEventListener("pointermove", onResizePointerMove);
+window.addEventListener("pointerup", onResizePointerUp);
+window.addEventListener("pointercancel", onResizePointerCancel);
 window.addEventListener("resize", onWindowResize);
 
 workspaceEl.addEventListener("dragover", onWorkspaceDragOver);
 workspaceEl.addEventListener("drop", onWorkspaceDrop);
+workspaceEl.addEventListener("pointerdown", onWorkspacePointerDownForResize);
 
 updateViewModeButton();
+syncResizeAffordanceMode();
 renderAndPersist();

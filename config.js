@@ -51,6 +51,10 @@ window.DOCK_CONFIG = {
   // Save/restore layout state from localStorage across reloads.
   persistLayout: true,
 
+  // Number of discrete resize levels used when dragging panel corners.
+  // Higher values allow finer snapped resizing; still never freeform.
+  resizeSnapLevels: 8,
+
   // Enables stacking by dropping directly on the tab strip.
   // Keep false for a rectangle-only model where stacking happens via center zone.
   allowTabStripStackZone: false

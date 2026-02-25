@@ -92,6 +92,47 @@
       panelEl.appendChild(bodyEl);
       panelEl.appendChild(metaEl);
 
+      if (interactive && typeof handlers.onResizeHandlePointerDown === "function") {
+        const handles = [
+          "top-left",
+          "top",
+          "top-right",
+          "right",
+          "bottom-right",
+          "bottom",
+          "bottom-left",
+          "left"
+        ];
+        for (const handle of handles) {
+          const handleEl = document.createElement("button");
+          handleEl.type = "button";
+          handleEl.className = `resize-handle resize-${handle}`;
+          handleEl.dataset.handle = handle;
+          handleEl.setAttribute("aria-label", `Resize panel from ${handle} edge`);
+          handleEl.addEventListener("pointerdown", (e) => handlers.onResizeHandlePointerDown(e, panel.id, handle));
+          panelEl.appendChild(handleEl);
+        }
+
+        const edgeRevealDistancePx = 18;
+        panelEl.addEventListener("pointermove", (e) => {
+          const rect = panelEl.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const nearLeft = x <= edgeRevealDistancePx;
+          const nearRight = x >= rect.width - edgeRevealDistancePx;
+          const nearTop = y <= edgeRevealDistancePx;
+          const nearBottom = y >= rect.height - edgeRevealDistancePx;
+
+          panelEl.classList.toggle("edge-left", nearLeft);
+          panelEl.classList.toggle("edge-right", nearRight);
+          panelEl.classList.toggle("edge-top", nearTop);
+          panelEl.classList.toggle("edge-bottom", nearBottom);
+        });
+        panelEl.addEventListener("pointerleave", () => {
+          panelEl.classList.remove("edge-left", "edge-right", "edge-top", "edge-bottom");
+        });
+      }
+
       if (interactive) {
         panelEl.addEventListener("click", (e) => handlers.onPanelClick(e, panel.id));
         panelEl.addEventListener("dragover", handlers.onPanelDragOver);
