@@ -46,6 +46,8 @@ function normalizeConfig(raw) {
     betweenSiblingHitSlopPx: asPositiveNumber(input.betweenSiblingHitSlopPx, DEFAULT_CONFIG.betweenSiblingHitSlopPx),
     defaultPreviewMode: asStringEnum(input.defaultPreviewMode, DEFAULT_CONFIG.defaultPreviewMode, VIEW_MODES),
     persistLayout: asBoolean(input.persistLayout, DEFAULT_CONFIG.persistLayout),
+    dropTransitionMs: asPositiveInt(input.dropTransitionMs, DEFAULT_CONFIG.dropTransitionMs),
+    previewTransitionMs: asPositiveInt(input.previewTransitionMs, DEFAULT_CONFIG.previewTransitionMs),
     allowTabStripStackZone: asBoolean(input.allowTabStripStackZone, DEFAULT_CONFIG.allowTabStripStackZone),
     tabStripStackZoneMinHeightPx: asPositiveNumber(input.tabStripStackZoneMinHeightPx, DEFAULT_CONFIG.tabStripStackZoneMinHeightPx),
     resizeSnapLevels: asPositiveInt(input.resizeSnapLevels, DEFAULT_CONFIG.resizeSnapLevels)
@@ -105,6 +107,8 @@ let resizeController = null;
 
 const PREVIEW_IDLE_MS = CONFIG.previewIdleMs;
 const PREVIEW_MOVE_THRESHOLD_PX = CONFIG.previewMoveThresholdPx;
+const DROP_TRANSITION_MS = CONFIG.dropTransitionMs;
+const PREVIEW_TRANSITION_MS = CONFIG.previewTransitionMs;
 const dragControllerApi = window.DragController;
 if (!dragControllerApi) {
   throw new Error("Missing DragController. Ensure dragController.js is loaded before app.js.");
@@ -413,6 +417,148 @@ function renderWithoutPersist() {
   syncOverlayForCurrentMode();
 }
 
+function capturePanelRects() {
+  const rectMap = new Map();
+  const panelEls = workspaceEl.querySelectorAll(".panel[data-panel-id]");
+  for (const panelEl of panelEls) {
+    const panelId = panelEl.dataset.panelId;
+    if (!panelId) continue;
+    const rect = panelEl.getBoundingClientRect();
+    rectMap.set(panelId, {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height
+    });
+  }
+  return rectMap;
+}
+
+function clearDropTransitionStyles(panelEl) {
+  panelEl.style.transition = "";
+  panelEl.style.transform = "";
+  panelEl.style.transformOrigin = "";
+  panelEl.style.willChange = "";
+}
+
+function animateDropTransition(previousRects, enteredPanelId = null) {
+  if (!previousRects || previousRects.size === 0) return;
+  const panelEls = Array.from(workspaceEl.querySelectorAll(".panel[data-panel-id]"));
+  if (panelEls.length === 0) return;
+
+  const movingPanels = [];
+  const epsilonPx = 0.5;
+
+  for (const panelEl of panelEls) {
+    const panelId = panelEl.dataset.panelId;
+    if (!panelId) continue;
+    const oldRect = previousRects.get(panelId);
+    const newRect = panelEl.getBoundingClientRect();
+
+    if (!oldRect) {
+      if (enteredPanelId && panelId === enteredPanelId) {
+        panelEl.classList.add("drop-panel-enter");
+        window.setTimeout(() => {
+          panelEl.classList.remove("drop-panel-enter");
+        }, DROP_TRANSITION_MS + 30);
+      }
+      continue;
+    }
+
+    if (newRect.width <= 0 || newRect.height <= 0) continue;
+
+    const dx = oldRect.left - newRect.left;
+    const dy = oldRect.top - newRect.top;
+    const sx = oldRect.width / newRect.width;
+    const sy = oldRect.height / newRect.height;
+    const moved = Math.abs(dx) > epsilonPx || Math.abs(dy) > epsilonPx;
+    const resized = Math.abs(1 - sx) > 0.01 || Math.abs(1 - sy) > 0.01;
+    if (!moved && !resized) continue;
+
+    clearDropTransitionStyles(panelEl);
+    panelEl.style.transition = "none";
+    panelEl.style.transformOrigin = "top left";
+    panelEl.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    panelEl.style.willChange = "transform";
+    movingPanels.push(panelEl);
+  }
+
+  if (movingPanels.length === 0) return;
+
+  window.requestAnimationFrame(() => {
+    for (const panelEl of movingPanels) {
+      panelEl.style.transition = `transform ${DROP_TRANSITION_MS}ms cubic-bezier(0.2, 0.78, 0.18, 1)`;
+      panelEl.style.transform = "translate(0px, 0px) scale(1, 1)";
+    }
+  });
+
+  window.setTimeout(() => {
+    for (const panelEl of movingPanels) {
+      clearDropTransitionStyles(panelEl);
+    }
+  }, DROP_TRANSITION_MS + 40);
+}
+
+function renderAndPersistWithDropTransition(previousRects, enteredPanelId = null) {
+  renderAndPersist();
+  animateDropTransition(previousRects, enteredPanelId);
+}
+
+function animatePreviewTransition(previewLayer, sourceRects) {
+  if (!previewLayer || !sourceRects || sourceRects.size === 0) return;
+  const previewPanels = Array.from(previewLayer.querySelectorAll(".panel[data-panel-id]"));
+  if (previewPanels.length === 0) return;
+
+  const movingPanels = [];
+  const epsilonPx = 0.5;
+  for (const panelEl of previewPanels) {
+    const panelId = panelEl.dataset.panelId;
+    if (!panelId) continue;
+    const oldRect = sourceRects.get(panelId);
+    const newRect = panelEl.getBoundingClientRect();
+    if (!oldRect) {
+      panelEl.style.opacity = "0.55";
+      panelEl.style.transform = "scale(0.92)";
+      panelEl.style.transition = "none";
+      panelEl.style.willChange = "transform, opacity";
+      movingPanels.push(panelEl);
+      continue;
+    }
+    if (newRect.width <= 0 || newRect.height <= 0) continue;
+    const dx = oldRect.left - newRect.left;
+    const dy = oldRect.top - newRect.top;
+    const sx = oldRect.width / newRect.width;
+    const sy = oldRect.height / newRect.height;
+    const moved = Math.abs(dx) > epsilonPx || Math.abs(dy) > epsilonPx;
+    const resized = Math.abs(1 - sx) > 0.01 || Math.abs(1 - sy) > 0.01;
+    if (!moved && !resized) continue;
+    panelEl.style.transition = "none";
+    panelEl.style.transformOrigin = "top left";
+    panelEl.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    panelEl.style.willChange = "transform";
+    movingPanels.push(panelEl);
+  }
+
+  if (movingPanels.length === 0) return;
+  window.requestAnimationFrame(() => {
+    for (const panelEl of movingPanels) {
+      panelEl.style.transition = `transform ${PREVIEW_TRANSITION_MS}ms cubic-bezier(0.2, 0.78, 0.18, 1), opacity ${PREVIEW_TRANSITION_MS}ms linear`;
+      panelEl.style.transform = "translate(0px, 0px) scale(1, 1)";
+      panelEl.style.opacity = "1";
+    }
+  });
+
+  window.setTimeout(() => {
+    for (const panelEl of movingPanels) {
+      panelEl.style.transition = "";
+      panelEl.style.transform = "";
+      panelEl.style.transformOrigin = "";
+      panelEl.style.opacity = "";
+      panelEl.style.willChange = "";
+    }
+  }, PREVIEW_TRANSITION_MS + 30);
+}
+
 const resizeControllerApi = window.ResizeController;
 if (!resizeControllerApi) {
   throw new Error("Missing ResizeController. Ensure resizeController.js is loaded before app.js.");
@@ -524,6 +670,7 @@ function buildDropPreviewTree(zone) {
 function showDropPreview(zone) {
   const previewLayer = document.getElementById("workspacePreview");
   if (!previewLayer) return;
+  const sourceRects = capturePanelRects();
   const previewTree = buildDropPreviewTree(zone);
   if (!previewTree) return;
   const treeDom = renderPreviewTree(previewTree);
@@ -534,6 +681,7 @@ function showDropPreview(zone) {
   previewLayer.classList.toggle("combined-tone", previewMode === "combined");
   previewLayer.classList.add("active");
   workspaceEl.classList.add("previewing");
+  animatePreviewTransition(previewLayer, sourceRects);
 }
 
 function scheduleIdlePreview() {
@@ -790,6 +938,7 @@ function onTabDragEnd() {
 function onCloseTabClick(e, panelId, tabId) {
   e.stopPropagation();
   e.preventDefault();
+  const previousRects = capturePanelRects();
 
   const nextRoot = cloneNode(root);
   const panelFound = findNodeById(nextRoot, panelId);
@@ -820,7 +969,7 @@ function onCloseTabClick(e, panelId, tabId) {
 
   cleanupDragUI(null);
   statusEl.textContent = `Removed Box ${removedTab.num}.`;
-  renderAndPersist();
+  renderAndPersistWithDropTransition(previousRects);
 }
 
 function onPanelDragOver(e) {
@@ -881,10 +1030,12 @@ function onPanelDrop(e) {
     return;
   }
 
+  const previousRects = capturePanelRects();
   executeDrop(zone, dragCtx.tab, dragCtx.sourcePanelId);
+  const enteredPanelId = previousRects.has(activePanelId) ? null : activePanelId;
   statusEl.textContent = `Dropped Box ${dragCtx.tab.num}: ${zone.type} (layer ${zone.layer}${zone.direction ? ` ${zone.direction}` : ""}).`;
   cleanupDragUI();
-  renderAndPersist();
+  renderAndPersistWithDropTransition(previousRects, enteredPanelId);
 }
 
 function onWorkspaceDragOver(e) {
@@ -922,10 +1073,12 @@ function onWorkspaceDrop(e) {
     return;
   }
 
+  const previousRects = capturePanelRects();
   executeDrop(zone, dragCtx.tab, dragCtx.sourcePanelId);
+  const enteredPanelId = previousRects.has(activePanelId) ? null : activePanelId;
   statusEl.textContent = `Dropped Box ${dragCtx.tab.num}: ${zone.type} (layer ${zone.layer}${zone.direction ? ` ${zone.direction}` : ""}).`;
   cleanupDragUI();
-  renderAndPersist();
+  renderAndPersistWithDropTransition(previousRects, enteredPanelId);
 }
 
 function createBoxInActiveSegment() {
@@ -1026,10 +1179,12 @@ function finishCreateButtonPointer(point) {
     return;
   }
 
+  const previousRects = capturePanelRects();
   executeDrop(hover.zone, dragCtx.tab, dragCtx.sourcePanelId);
+  const enteredPanelId = previousRects.has(activePanelId) ? null : activePanelId;
   statusEl.textContent = `Created Box ${dragCtx.tab.num}: ${hover.zone.type} (layer ${hover.zone.layer}${hover.zone.direction ? ` ${hover.zone.direction}` : ""}).`;
   cleanupDragUI();
-  renderAndPersist();
+  renderAndPersistWithDropTransition(previousRects, enteredPanelId);
 }
 
 function cancelCreateButtonDragIfStarted(message) {

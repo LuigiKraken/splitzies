@@ -27,6 +27,10 @@ window.DOCK_CONFIG = {
   persistLayout: true,
   // Snapped resize levels.
   resizeSnapLevels: 8,
+  // Duration of drop layout transition in milliseconds.
+  dropTransitionMs: 130,
+  // Duration of preview layout transition in milliseconds.
+  previewTransitionMs: 90,
   // Allow stacking by dropping on tab strip.
   allowTabStripStackZone: true,
   // Minimum panel height in px below which the tab strip stack zone is
