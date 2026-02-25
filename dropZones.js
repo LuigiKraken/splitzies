@@ -427,9 +427,31 @@
       const panelBounds = panelEl.getBoundingClientRect();
       const descriptors = [];
       const tabsEl = panelEl.querySelector(".tabs");
-      const tabsBounds = tabsEl ? tabsEl.getBoundingClientRect() : null;
+      let tabsBounds = null;
+      if (tabsEl) {
+        const tabEls = Array.from(tabsEl.querySelectorAll(".tab"));
+        if (tabEls.length > 0) {
+          const stripRect = tabsEl.getBoundingClientRect();
+          let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+          let lastTabWidth = 0;
+          for (const tabEl of tabEls) {
+            const r = tabEl.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) continue;
+            left = Math.min(left, r.left);
+            top = Math.min(top, r.top);
+            right = Math.max(right, r.right);
+            bottom = Math.max(bottom, r.bottom);
+            lastTabWidth = r.width;
+          }
+          const extendedRight = Math.min(right + lastTabWidth * (2 / 3), stripRect.right);
+          if (left < extendedRight && top < bottom) {
+            tabsBounds = { left, top, width: extendedRight - left, height: bottom - top };
+          }
+        }
+      }
 
-      if (tabsBounds && config.allowTabStripStackZone) {
+      if (tabsBounds && config.allowTabStripStackZone
+          && panelBounds.height >= config.tabStripStackZoneMinHeightPx) {
         descriptors.push({
           key: "display-stack-tabs",
           layer: 0,

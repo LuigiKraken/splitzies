@@ -28,5 +28,8 @@ window.DOCK_CONFIG = {
   // Snapped resize levels.
   resizeSnapLevels: 8,
   // Allow stacking by dropping on tab strip.
-  allowTabStripStackZone: false
+  allowTabStripStackZone: true,
+  // Minimum panel height in px below which the tab strip stack zone is
+  // suppressed to avoid conflicting with the center and directional zones.
+  tabStripStackZoneMinHeightPx: 120
 };
