@@ -7,7 +7,7 @@ const DEFAULTS = {
   maxTotalBoxCount: 30,            // Global cap on total boxes/tabs
   maxHorizontalStack: 6,           // Max siblings in horizontal stacks (column axis)
   maxVerticalStack: 6,             // Max siblings in vertical stacks (row axis)
-  previewIdleMs: 60,               // Idle time before drop preview appears
+  previewIdleMs: 0,                // Idle time before drop preview appears
   previewMoveThresholdPx: 4,       // Pointer-move threshold for preview jitter filtering
   betweenSiblingHitSlopPx: 10,     // Extra hit slop around sibling boundaries
   defaultPreviewMode: "preview",   // Initial drag visualization: hitbox | preview | combined
