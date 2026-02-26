@@ -26,6 +26,11 @@ const ACTION_COLORS = {
 
 function zoneOutcomeKey(zone) {
   if (!zone || zone.type === "INVALID") return "INVALID";
+  // Use outcome-based key so zones that produce the same layout share the same color
+  // (e.g. left edge of right panel vs right edge of left panel → same EQUALIZE result)
+  if (zone.type === "EQUALIZE") {
+    return ["EQUALIZE", zone.targetId, Number.isFinite(zone.insertIndex) ? zone.insertIndex : ""].join("|");
+  }
   return [zone.type, zone.direction, zone.panelId, zone.targetId, Number.isFinite(zone.insertIndex) ? zone.insertIndex : ""].join("|");
 }
 
