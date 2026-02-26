@@ -202,7 +202,7 @@ function formatZoneSummary(zone) {
 
 function syncOverlayForCurrentMode() {
   if (drag.dragCtx) return;
-  if (previewMode === "hitbox") drawZonesForWorkspace(buildPanelInfoMap(root), null, null, { dimUnselected: false });
+  if (previewMode === "hitbox" || previewMode === "combined") drawZonesForWorkspace(buildPanelInfoMap(root), null, null, { dimUnselected: false });
   else clearDragOverlay();
 }
 
@@ -222,9 +222,11 @@ function updateHoverFromPoint(x, y) {
   const hover = resolveHoverAtPoint(panelInfoMap, x, y);
   if (!hover) {
     drag.hoverPreview = null;
-    if (previewMode === "hitbox") {
+    if (previewMode === "hitbox" || previewMode === "combined") {
       drawZonesForWorkspace(panelInfoMap, null, null, { dimUnselected: false });
-      statusEl.textContent = "Hitbox mode: all drop zones remain visible while dragging.";
+      statusEl.textContent = previewMode === "hitbox"
+        ? "Hitbox mode: all drop zones remain visible while dragging."
+        : "Combined mode: all drop zones remain visible while dragging.";
     } else {
       clearDragOverlay();
       statusEl.textContent = "Move over a panel to preview drop zones.";
@@ -275,7 +277,12 @@ function scheduleIdlePreview() {
     if (!hover || !hover.zone) return;
     if (hover.zone.type === "INVALID") { statusEl.textContent = `Preview blocked: ${hover.zone.reason}`; return; }
     drag.hoverPreview = { panelId: hover.panelId || null, depth: hover.info ? hover.info.depth : null, zone: hover.zone };
-    clearDragOverlay();
+    if (previewMode === "combined") {
+      const overlay = document.getElementById("workspaceOverlay");
+      if (overlay) overlay.classList.add("faded");
+    } else {
+      clearDragOverlay();
+    }
     showDropPreview(hover.zone);
     statusEl.textContent = `Preview: ${formatZoneSummary(hover.zone)}. Hold still to inspect, move to continue searching.`;
   }, CONFIG.previewIdleMs);
@@ -300,9 +307,11 @@ function dispatchDragOver(x, y) {
   } else if (previewMode === "combined") {
     drag.handlePreviewModeDragOver(x, y, () => {
       clearDropPreviewLayer();
+      const overlay = document.getElementById("workspaceOverlay");
+      if (overlay) overlay.classList.remove("faded");
       drag.hoverPreview = null;
       updateHoverFromPoint(x, y);
-      statusEl.textContent = "Combined mode: hitboxes visible while moving. Pause briefly for a softer preview replacement.";
+      statusEl.textContent = "Combined mode: hitboxes visible while moving. Pause briefly for a softer preview overlay.";
       scheduleIdlePreview();
     });
   } else {
@@ -609,7 +618,7 @@ function updateViewModeButton() {
 }
 
 const syncResizeAffordance = () => {
-  workspaceEl.dataset.resizeAffordance = previewMode === "hitbox" ? "circles" : "cursor-only";
+  workspaceEl.dataset.resizeAffordance = (previewMode === "hitbox" || previewMode === "combined") ? "circles" : "cursor-only";
 };
 
 viewModeBtn.addEventListener("click", () => {
@@ -621,13 +630,15 @@ viewModeBtn.addEventListener("click", () => {
   const msgs = {
     hitbox: { drag: "Hitbox mode enabled. Showing raw hit zones while dragging.", idle: "Hitbox mode enabled. Drag tabs to inspect drop zones." },
     preview: { drag: "Preview mode enabled. Hitboxes stay hidden while moving; pause briefly to see the drop preview.", idle: "Preview mode enabled. While dragging: move without hitboxes, then pause briefly for a live drop preview." },
-    combined: { drag: "Combined mode enabled. Hitboxes show while moving; pause to see a softer preview replacement.", idle: "Combined mode enabled. While dragging: hitboxes stay visible while moving, then a softer preview replaces them on pause." }
+    combined: { drag: "Combined mode enabled. Hitboxes always visible; pause to see a softer preview overlay.", idle: "Combined mode enabled. Hitboxes always visible. Drag tabs to see drop zones and pause for a preview overlay." }
   };
 
   if (drag.dragCtx && drag.lastDragPoint) {
     drag.stopPreviewIdleTimer();
     drag.hoverAnchorPoint = drag.lastDragPoint;
     clearDropPreviewLayer();
+    const overlay = document.getElementById("workspaceOverlay");
+    if (overlay) overlay.classList.remove("faded");
     if (previewMode === "preview") showPreviewSearchState(drag.lastDragPoint.x, drag.lastDragPoint.y);
     else updateHoverFromPoint(drag.lastDragPoint.x, drag.lastDragPoint.y);
     if (previewMode === "preview" || previewMode === "combined") scheduleIdlePreview();

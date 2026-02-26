@@ -128,7 +128,7 @@ export function createRenderer(workspaceEl, treeViewEl, { getRoot, getActivePane
 
   function clearDragOverlay() {
     const overlay = document.getElementById("workspaceOverlay");
-    if (overlay) overlay.innerHTML = "";
+    if (overlay) { overlay.innerHTML = ""; overlay.classList.remove("faded"); }
     clearDropPreviewLayer();
     workspaceEl.querySelectorAll(".panel.drag-hover").forEach((p) => p.classList.remove("drag-hover"));
   }

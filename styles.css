@@ -280,7 +280,8 @@ html, body {
   filter: saturate(0.72) brightness(1.04);
   opacity: 0.88;
 }
-.workspace-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 70; }
+.workspace-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 70; transition: opacity 120ms linear; }
+.workspace-overlay.faded { opacity: 0.3; }
 .workspace-overlay .zone {
   position: absolute;
   transition: opacity 80ms linear, filter 80ms linear, box-shadow 80ms linear;
