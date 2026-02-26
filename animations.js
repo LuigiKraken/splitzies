@@ -23,8 +23,8 @@ export function createAnimations(workspaceEl, { dropTransitionMs, previewTransit
 
       if (!oldRect) {
         if (isPreview) {
-          panelEl.style.opacity = "0.55";
-          panelEl.style.transform = "scale(0.92)";
+          panelEl.style.opacity = "0";
+          panelEl.style.transform = "scale(0.96)";
           panelEl.style.transition = "none";
           panelEl.style.willChange = "transform, opacity";
           movingPanels.push(panelEl);

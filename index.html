@@ -4,6 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Splitzies</title>
+  <script>
+    (function() {
+      try {
+        var dark = localStorage.getItem("splitzies-dark-mode") !== "0";
+        document.documentElement.dataset.theme = dark ? "dark" : "";
+      } catch (_) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>

@@ -262,8 +262,7 @@ function showDropPreview(zone) {
   const treeDom = renderPreviewTree(previewTree);
   treeDom.style.width = "100%";
   treeDom.style.height = "100%";
-  previewLayer.innerHTML = "";
-  previewLayer.appendChild(treeDom);
+  previewLayer.replaceChildren(treeDom);
   previewLayer.classList.toggle("combined-tone", previewMode === "combined");
   previewLayer.classList.add("active");
   workspaceEl.classList.add("previewing");
