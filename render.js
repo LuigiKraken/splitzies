@@ -1,4 +1,4 @@
-import { buildPanelInfoMap, findNodeById, panelTreeString } from "./layoutModel.js";
+import { buildPanelInfoMap, findNodeById, panelTreeString } from "./core/layoutModel.js";
 
 export function createRenderer(workspaceEl, treeViewEl, { getRoot, getActivePanelId, setActivePanelId, handlers }) {
 

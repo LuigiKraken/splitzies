@@ -2,8 +2,8 @@ import { CONFIG, VIEW_MODES } from "./config.js";
 import {
   cloneNode, axisForDirection, isBeforeDirection, buildPanelInfoMap,
   findNodeById, removePanelAndCollapse, getPanelCount, getTotalBoxCount, getFirstPanel
-} from "./layoutModel.js";
-import { executeDrop } from "./dropActions.js";
+} from "./core/layoutModel.js";
+import { executeDrop } from "./core/dropActions.js";
 import { createDropZones } from "./dropZones.js";
 import { createDragController } from "./dragController.js";
 import { createResizeController } from "./resizeController.js";
@@ -162,9 +162,9 @@ function applyDarkMode(dark) {
   isDarkMode = dark;
   document.documentElement.dataset.theme = dark ? "dark" : "";
   darkModeBtn.textContent = dark ? "Light Mode" : "Dark Mode";
-  try { localStorage.setItem("dock-dark-mode", dark ? "1" : "0"); } catch (_) {}
+  try { localStorage.setItem("splitsy-dark-mode", dark ? "1" : "0"); } catch (_) {}
 }
-try { applyDarkMode(localStorage.getItem("dock-dark-mode") === "1"); } catch (_) { applyDarkMode(false); }
+try { applyDarkMode(localStorage.getItem("splitsy-dark-mode") === "1"); } catch (_) { applyDarkMode(false); }
 darkModeBtn.addEventListener("click", () => applyDarkMode(!isDarkMode));
 
 // ── Drag ghost ───────────────────────────────────────────────────────────────

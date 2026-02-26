@@ -1,4 +1,4 @@
-import { cloneNode, buildPanelInfoMap, findNodeById, axisForDirection, isBeforeDirection } from "./layoutModel.js";
+import { cloneNode, buildPanelInfoMap, findNodeById, axisForDirection, isBeforeDirection } from "./core/layoutModel.js";
 
 export function createResizeController(config, workspaceEl, statusEl, { getRoot, setRoot, setActivePanelId, getDragCtx, renderWithoutPersist, renderAndPersist }) {
   let resizeSession = null;

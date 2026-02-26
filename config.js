@@ -10,7 +10,7 @@ const DEFAULTS = {
   previewIdleMs: 300,              // Idle time before drop preview appears
   previewMoveThresholdPx: 4,       // Pointer-move threshold for preview jitter filtering
   betweenSiblingHitSlopPx: 10,     // Extra hit slop around sibling boundaries
-  defaultPreviewMode: "preview",   // Initial drag visualization: hitbox | preview | combined
+  defaultPreviewMode: "hitbox",    // Initial drag visualization: hitbox | preview | combined
   persistLayout: true,             // Persist layout state in localStorage
   resizeSnapLevels: 8,             // Snapped resize levels
   dropTransitionMs: 130,           // Duration of drop layout transition
@@ -33,8 +33,8 @@ function normalizeConfig(raw) {
   return c;
 }
 
-const override = (typeof window.DOCK_CONFIG_OVERRIDE === "object" && window.DOCK_CONFIG_OVERRIDE)
-  ? window.DOCK_CONFIG_OVERRIDE
+const override = (typeof window.SPLITSY_CONFIG === "object" && window.SPLITSY_CONFIG)
+  ? window.SPLITSY_CONFIG
   : {};
 
 export const CONFIG = Object.freeze(normalizeConfig(override));

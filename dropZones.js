@@ -1,9 +1,9 @@
-import { axisForDirection, isAlongAxis, isBeforeDirection, findNodeById } from "./layoutModel.js";
+import { axisForDirection, isAlongAxis, isBeforeDirection, findNodeById } from "./core/layoutModel.js";
 import {
   clamp, pointInRect, pointInPolygon,
   getCenterRect, getEffectiveLayerCount,
   getDisplayDirectionalBandPolygon, polygonToClipPath
-} from "./geometry.js";
+} from "./core/geometry.js";
 
 const OUTCOME_PALETTE = [
   "rgba(239, 68, 68, 0.30)", "rgba(249, 115, 22, 0.30)", "rgba(234, 179, 8, 0.30)",

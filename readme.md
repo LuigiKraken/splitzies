@@ -1,46 +1,126 @@
-# Tab Drag-and-Drop Split Zone Pattern
+# Splitsy
 
-## Running the Demo
+**An interactive tech demo showing how any rectangle can be recursively segmented into further rectangles — and a portable blueprint for implementing this layout management pattern in any programming language.**
 
-This is a vanilla JavaScript app using ES modules. No build step required.
+Use the interface to get a feel for how it works. Read the code to see how it's implemented. Port the algorithm to your own stack.
 
-**Local testing:**
+**[Live Demo](#)** — *deploy to GitHub Pages and update this link*
+
+<!-- Add a screenshot or animated GIF here showing the demo in action -->
+
+---
+
+## What Is This?
+
+A workspace starts as a single rectangle. That rectangle can be split into two halves. Each half can be split again. New rectangles can be inserted alongside existing ones. Any group can be wrapped in a perpendicular split. The result is an arbitrarily deep tree of nested rows and columns — a layout.
+
+This project provides both the **portable algorithm** (in [`core/`](./core/)) and a **browser-based demo** that lets you interact with it through drag-and-drop.
+
+At its core, dropping a tab does one of four things:
+
+| Action       | What it does                                   |
+|--------------|------------------------------------------------|
+| **STACK**    | Add a tab to an existing panel (no layout change) |
+| **SPLIT**    | Cut a single panel in half (50/50)              |
+| **EQUALIZE** | Insert a new sibling into a row/column; all children reset to equal size |
+| **WRAP**     | Nest an existing container in a new perpendicular split |
+
+The demo offers three interaction modes: **Hitbox** (shows all drop zones while dragging — best for understanding the zone system), **Preview** (zones hidden while moving, live preview appears on pause), and **Combined** (both). Hitbox is the default.
+
+---
+
+## Quick Start
+
+Vanilla JavaScript. No dependencies. No build step.
 
 ```bash
-# Option 1: Python (built-in on Mac/Linux, usually on Windows)
+# Python
 python -m http.server 8000
 
-# Option 2: Node.js
+# or Node.js
 npx http-server -p 8080
 
-# Then open: http://localhost:8000 (or :8080)
+# Then open http://localhost:8000 (or :8080)
 ```
 
-**Deployment:**
+ES modules require an HTTP server (`file://` won't work). Any server works.
 
-Since this is static HTML/CSS/JS with no dependencies, you can deploy it anywhere:
-
-- **GitHub Pages**: Push to GitHub, enable Pages in repo settings, done.
-- **Netlify/Vercel**: Drag the folder into their web UI or connect the repo.
-- **Any static host**: Upload the files to any web server.
-
-ES modules require an HTTP server (they don't work with `file://` protocol). Any server works -- even the simplest one.
+**Deploying:** Since this is static HTML/CSS/JS, you can deploy anywhere — GitHub Pages, Netlify, Vercel, or any static host. A GitHub Actions workflow is included at [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml).
 
 ---
 
-## Algorithm Overview
+## Project Structure
 
-At its core, dropping a tab does one of three things:
+```
+splitsy/
+├── core/                    ← Portable algorithm (framework-independent)
+│   ├── layoutModel.js       Tree data structure and operations
+│   ├── geometry.js          Zone shape math (polygons, clipping, hit testing)
+│   └── dropActions.js       Drop execution (STACK, SPLIT, EQUALIZE, WRAP)
+│
+├── index.html               Entry point
+├── config.js                Configuration constants
+├── app.js                   Application orchestrator and event handling
+├── dropZones.js             Zone generation, constraint validation, overlay rendering
+├── render.js                DOM rendering (tree → HTML)
+├── dragController.js        Drag session state management
+├── resizeController.js      Panel resize logic
+├── animations.js            FLIP-style layout transitions
+├── persistence.js           localStorage save/restore
+└── styles.css               Stylesheet
+```
 
-1. **Stack** — add it to an existing panel as a browser-style tab. No layout change.
-2. **Split** — cut a single panel in half (50/50), placing the new panel beside it.
-3. **Insert** — shove the new panel into an existing row or column of siblings, before or after a specific sibling, resizing all of them equally.
-
-The complication is that a panel can be inside a column that is itself inside a row — so the same drag gesture can target different ancestor containers depending on where exactly the cursor lands. Dropping near the inner edge of a panel splits that panel. Dropping near the outer edge inserts into its parent row or column. Dropping even further out inserts into its grandparent — and so on. The zone system is just a formal way to express that hierarchy spatially.
+**`core/`** contains the algorithm you'd port to another language. Everything else is the browser demo that visualizes it.
 
 ---
 
-## 1. Layout Model
+## Porting to Another Language
+
+The algorithm needs four things:
+
+1. **A tree data structure** ([`core/layoutModel.js`](./core/layoutModel.js))
+   Leaf nodes are panels. Internal nodes are row/column containers with size ratios among their children. Operations: clone, find by ID, remove-and-collapse.
+
+2. **Zone geometry** ([`core/geometry.js`](./core/geometry.js))
+   Given a rectangle's bounds and its depth in the tree, compute concentric directional zones — triangular sectors subdivided into equal-width bands. Pure math, no framework dependency.
+
+3. **Drop execution** ([`core/dropActions.js`](./core/dropActions.js))
+   Given a zone descriptor, apply one of four operations to the tree: STACK, SPLIT, EQUALIZE, or WRAP. Returns a new tree (immutable updates via cloning).
+
+4. **A renderer** (your framework's layout system)
+   Walk the tree and position rectangles. Containers use flex-like proportional sizing — each child has a size ratio relative to its siblings.
+
+Everything outside `core/` — drag handling, animations, persistence, overlay rendering — is browser-specific demo chrome. The zone *resolution* logic (determining which action fires based on the ancestor chain and cursor position) is documented in the [Algorithm Reference](#algorithm-reference) below and implemented in [`dropZones.js`](./dropZones.js).
+
+---
+
+## Configuration
+
+All tunable parameters live in [`config.js`](./config.js). Override any default at runtime by setting `window.SPLITSY_CONFIG` before the app script loads:
+
+```html
+<script>
+  window.SPLITSY_CONFIG = { centerFraction: 0.25, maxDepth: 4 };
+</script>
+<script type="module" src="./app.js"></script>
+```
+
+Key parameters:
+
+| Parameter              | Default | Description |
+|------------------------|---------|-------------|
+| `centerFraction`       | 0.32    | Size of the center STACK zone relative to the panel |
+| `maxDepth`             | 6       | Max ancestor levels exposed as directional layers |
+| `minBoxWidthFraction`  | 0.08    | Minimum panel width as fraction of workspace |
+| `minBoxHeightFraction` | 0.08    | Minimum panel height as fraction of workspace |
+| `resizeSnapLevels`     | 8       | Number of discrete resize snap positions |
+| `maxTotalBoxCount`     | 30      | Global cap on total panels/tabs |
+
+---
+
+## Algorithm Reference
+
+### 1. Layout Model
 
 The workspace is a **tree**:
 
@@ -65,11 +145,9 @@ Nesting is natural: `row[A, column[B, C]]` = A on top, B and C side by side belo
 | `column`  | left → right | LEFT, RIGHT          | TOP, BOTTOM            |
 | `row`     | top → bottom | TOP, BOTTOM          | LEFT, RIGHT            |
 
----
+### 2. Drop Zone Algorithm
 
-## 2. Drop Zone Algorithm
-
-### 2.1 Zone Layers
+#### 2.1 Zone Layers
 
 For a panel at depth D, hovering it produces:
 
@@ -78,7 +156,7 @@ For a panel at depth D, hovering it produces:
 
 Layers radiate outward from center to edge. Each layer targets a progressively higher ancestor.
 
-### 2.2 The Four Actions
+#### 2.2 The Four Actions
 
 | Action      | What it does                              | Sizing           | Available at  |
 |-------------|-------------------------------------------|------------------|---------------|
@@ -87,7 +165,7 @@ Layers radiate outward from center to edge. Each layer targets a progressively h
 | **EQUALIZE**| Insert new sibling; all children → 1/N   | Equal            | Layer 2+, along axis |
 | **WRAP**    | Nest ancestor in a new perpendicular container | 50/50       | Layer 2+, perpendicular to axis |
 
-### 2.3 Which Action Fires
+#### 2.3 Which Action Fires
 
 | Layer | Ancestor   | Dir vs axis    | Action        |
 |-------|-----------|----------------|---------------|
@@ -98,9 +176,7 @@ Layers radiate outward from center to edge. Each layer targets a progressively h
 
 **SPLIT** subdivides a single panel in half. **EQUALIZE** adds a peer alongside existing siblings and resets all to equal size (2→3→4→N, always 1/N each). **WRAP** introduces a new split axis by nesting an ancestor — enabling a subsequent EQUALIZE in that new direction.
 
----
-
-## 3. Zone Shape
+### 3. Zone Shape
 
 Diagonal lines from each corner through the center divide the panel into 4 triangular sectors (TOP, BOTTOM, LEFT, RIGHT). A small rectangle at the intersection is the center zone (Layer 0). Each sector is then subdivided into D+1 equal-width concentric bands, innermost = Layer 1, outermost = Layer D+1.
 
@@ -119,9 +195,7 @@ Diagonal lines from each corner through the center divide the panel into 4 trian
 
 Every pixel belongs to exactly one zone. Adjacent panels' outermost zones at a shared edge always produce the same drop result, making the boundary seamless.
 
----
-
-## 4. Example: Two Panels Side by Side
+### 4. Example: Two Panels Side by Side
 
 ```
 TREE: column[A, B]   (each panel at depth 1 → 2 directional layers, 9 zones each)
@@ -146,9 +220,7 @@ L2:Top (full-width strip above):    L2:Left (equal thirds):
 └──────────┴───────────┘            └───────┴───────┴──────┘
 ```
 
----
-
-## 5. Example: Mixed Layout (Depth 2)
+### 5. Example: Mixed Layout (Depth 2)
 
 This is where the layered system earns its complexity. When a panel is nested inside an existing split, its drop zones reach up through multiple ancestor containers — producing fundamentally different results at each layer.
 
@@ -196,11 +268,9 @@ L2:Left — thirds within bottom half:    L3:Left — new full-height column on 
 
 The same drag gesture — drop on the top edge of BL — produces four different outcomes depending on which concentric band the cursor lands in. That's the zone system working as intended.
 
----
+### 6. Algorithm Pseudocode
 
-## 7. Algorithm Pseudocode
-
-### 7.1 Generating Drop Zones
+#### 6.1 Generating Drop Zones
 
 ```
 function generateDropZones(panel):
@@ -227,7 +297,7 @@ function generateDropZones(panel):
     return zones
 ```
 
-### 7.2 Executing a Drop
+#### 6.2 Executing a Drop
 
 ```
 function executeDrop(action, draggedTab):
@@ -260,7 +330,7 @@ function executeDrop(action, draggedTab):
             replace action.ancestor with wrapper in its parent
 ```
 
-### 7.3 Hit-Testing a Point
+#### 6.3 Hit-Testing a Point
 
 ```
 function hitTestZone(panel, mouseX, mouseY):
@@ -275,9 +345,7 @@ function hitTestZone(panel, mouseX, mouseY):
     return zones[layerIndex + 1][sector]
 ```
 
----
-
-## 8. Sizing Rules
+### 7. Sizing Rules
 
 | Action       | Sizing                                          |
 |--------------|-------------------------------------------------|
@@ -288,9 +356,7 @@ function hitTestZone(panel, mouseX, mouseY):
 
 EQUALIZE always resets all sibling sizes, regardless of prior values. A 60/40 split with a third panel inserted becomes 33/33/33.
 
----
-
-## 9. Panel Removal
+### 8. Panel Removal
 
 When the last tab is removed from a panel:
 
@@ -300,9 +366,7 @@ When the last tab is removed from a panel:
 
 No single-child containers persist.
 
----
-
-## 10. Practical Limits
+### 9. Practical Limits
 
 The algorithm is theoretically unbounded but practically constrained:
 
@@ -312,5 +376,16 @@ The algorithm is theoretically unbounded but practically constrained:
 
 These are implementation constraints only; the underlying logic is unchanged at any depth.
 
+---
 
-This window management model follows the established tabbed docking (dockable panes) paradigm commonly used in IDEs and professional applications. It is conceptually similar to systems that use a docking compass or overlay drop targets, where dragging a tab reveals directional placement zones for splitting, stacking, or inserting panels. The key difference is that instead of a fixed set of compass arrows, this system formalizes the behavior as a layered, ancestor-aware zone model: inner zones operate on the hovered panel, while progressively outer bands target parent and higher-level split containers. In standard terminology, this supports tab grouping (stacking), split docking (left/right/top/bottom splits), dock insertion into existing rows or columns, and container wrapping (introducing a new split axis). The result is a deterministic, infinitely nestable docking layout built on a tree of row/column split containers, with explicit and predictable resizing rules.
+## Context
+
+This layout model follows the tabbed docking paradigm used in IDEs and professional applications. It is conceptually similar to systems that use a docking compass or overlay drop targets. The key difference is that instead of a fixed set of compass arrows, this system formalizes the behavior as a layered, ancestor-aware zone model: inner zones operate on the hovered panel, while progressively outer bands target parent and higher-level split containers.
+
+In standard terminology, this supports tab grouping (stacking), split docking (left/right/top/bottom splits), dock insertion into existing rows or columns, and container wrapping (introducing a new split axis). The result is a deterministic, infinitely nestable docking layout built on a tree of row/column split containers, with explicit and predictable resizing rules.
+
+---
+
+## License
+
+[MIT](./LICENSE)
