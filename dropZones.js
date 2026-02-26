@@ -165,7 +165,27 @@ export function createDropZones(config, workspaceEl, { canAddSiblingToAxis, getR
     }
 
     const bounds = panelBounds;
-    const centerRect = getCenterRect(bounds, config);
+    const startRatio = clamp(config.centerFraction, 0, 0.95);
+    const totalLayers = getEffectiveLayerCount(bounds, info.depth, config);
+
+    // Check which layer-1 directions are invalid to expand center zone
+    const invalidDirs = ["TOP", "BOTTOM", "LEFT", "RIGHT"].filter((dir) => {
+      const reachable = getReachableLayerCount(info, totalLayers, dir);
+      return reachable > 0 && resolveDirectionalZone(info, panelBounds, 1, dir).type === "INVALID";
+    });
+
+    // Expand center zone into invalid directions to eliminate dead zones
+    let centerRect = getCenterRect(bounds, config);
+    if (invalidDirs.length > 0) {
+      let left = centerRect.left, top = centerRect.top;
+      let right = centerRect.left + centerRect.width, bottom = centerRect.top + centerRect.height;
+      if (invalidDirs.includes("LEFT")) left = bounds.left;
+      if (invalidDirs.includes("RIGHT")) right = bounds.left + bounds.width;
+      if (invalidDirs.includes("TOP")) top = bounds.top;
+      if (invalidDirs.includes("BOTTOM")) bottom = bounds.top + bounds.height;
+      centerRect = { left, top, width: right - left, height: bottom - top };
+    }
+
     descriptors.push({
       key: "display-stack-center", layer: 0, direction: null,
       geometry: { kind: "rect", bounds: centerRect },
@@ -173,11 +193,13 @@ export function createDropZones(config, workspaceEl, { canAddSiblingToAxis, getR
       hit: (x, y) => pointInRect(x, y, centerRect)
     });
 
-    const startRatio = clamp(config.centerFraction, 0, 0.95);
-    const totalLayers = getEffectiveLayerCount(bounds, info.depth, config);
+    // Create directional zones, skipping invalid layer-1 directions
     for (const direction of ["TOP", "BOTTOM", "LEFT", "RIGHT"]) {
       const reachable = getReachableLayerCount(info, totalLayers, direction);
       for (let layer = 1; layer <= reachable; layer++) {
+        const zone = resolveDirectionalZone(info, panelBounds, layer, direction);
+        if (zone.type === "INVALID") continue;
+
         const isOuterEdge = layer === reachable;
         if (isOuterEdge) {
           const edgeRect = getDisplayDirectionalEdgeRect(bounds, reachable, direction, startRatio);
@@ -185,7 +207,7 @@ export function createDropZones(config, workspaceEl, { canAddSiblingToAxis, getR
           descriptors.push({
             key: `display-layer-${layer}-${direction}`, layer, direction,
             geometry: { kind: "rect", bounds: edgeRect },
-            zone: resolveDirectionalZone(info, panelBounds, layer, direction),
+            zone,
             hit: (x, y) => pointInRect(x, y, edgeRect)
           });
         } else {
@@ -194,7 +216,7 @@ export function createDropZones(config, workspaceEl, { canAddSiblingToAxis, getR
           descriptors.push({
             key: `display-layer-${layer}-${direction}`, layer, direction,
             geometry: { kind: "polygon", bounds, points: poly, clipPath: polygonToClipPath(bounds, poly) },
-            zone: resolveDirectionalZone(info, panelBounds, layer, direction),
+            zone,
             hit: (x, y) => pointInPolygon(x, y, poly)
           });
         }
