@@ -1,114 +1,65 @@
-(function attachDragController(global) {
-  "use strict";
+export function createDragController(previewMoveThresholdPx) {
+  const state = {
+    dragCtx: null,
+    hoverPreview: null,
+    lastDragPoint: null,
+    dragPreviewTimer: null,
+    previewIdleTimer: null,
+    hoverAnchorPoint: null
+  };
 
-  function create(deps) {
-    const { previewMoveThresholdPx } = deps;
-
-    const state = {
-      dragCtx: null,
-      hoverPreview: null,
-      lastDragPoint: null,
-      dragPreviewTimer: null,
-      previewIdleTimer: null,
-      hoverAnchorPoint: null
-    };
-
-    function setDragCtx(value) {
-      state.dragCtx = value;
-    }
-
-    function getDragCtx() {
-      return state.dragCtx;
-    }
-
-    function setHoverPreview(value) {
-      state.hoverPreview = value;
-    }
-
-    function getHoverPreview() {
-      return state.hoverPreview;
-    }
-
-    function setLastDragPoint(value) {
-      state.lastDragPoint = value;
-    }
-
-    function getLastDragPoint() {
-      return state.lastDragPoint;
-    }
-
-    function setHoverAnchorPoint(value) {
-      state.hoverAnchorPoint = value;
-    }
-
-    function stopPreviewIdleTimer() {
-      if (!state.previewIdleTimer) return;
-      clearTimeout(state.previewIdleTimer);
-      state.previewIdleTimer = null;
-    }
-
-    function stopDragPreviewTimer() {
-      if (!state.dragPreviewTimer) return;
-      clearInterval(state.dragPreviewTimer);
-      state.dragPreviewTimer = null;
-    }
-
-    function schedulePreviewIdle(callback, idleMs) {
-      stopPreviewIdleTimer();
-      state.previewIdleTimer = window.setTimeout(callback, idleMs);
-    }
-
-    function startDragPreviewTimer(callback, intervalMs) {
-      stopDragPreviewTimer();
-      state.dragPreviewTimer = window.setInterval(callback, intervalMs);
-    }
-
-    function getPointerDistance(a, b) {
-      if (!a || !b) return Infinity;
-      return Math.hypot(a.x - b.x, a.y - b.y);
-    }
-
-    function handlePreviewModeDragOver(x, y, onMovedBeyondThreshold) {
-      const point = { x, y };
-      const movedDistance = getPointerDistance(state.hoverAnchorPoint, point);
-      if (!state.hoverAnchorPoint || movedDistance > previewMoveThresholdPx) {
-        state.hoverAnchorPoint = point;
-        onMovedBeyondThreshold(point);
-      }
-    }
-
-    function resetDragSession() {
-      state.dragCtx = null;
-      state.hoverPreview = null;
-      state.lastDragPoint = null;
-      state.hoverAnchorPoint = null;
-      stopDragPreviewTimer();
-      stopPreviewIdleTimer();
-    }
-
-    function hasTransientState() {
-      return !!(state.dragCtx || state.hoverPreview);
-    }
-
-    return {
-      setDragCtx,
-      getDragCtx,
-      setHoverPreview,
-      getHoverPreview,
-      setLastDragPoint,
-      getLastDragPoint,
-      setHoverAnchorPoint,
-      stopPreviewIdleTimer,
-      stopDragPreviewTimer,
-      schedulePreviewIdle,
-      startDragPreviewTimer,
-      handlePreviewModeDragOver,
-      resetDragSession,
-      hasTransientState
-    };
+  function stopPreviewIdleTimer() {
+    if (state.previewIdleTimer) { clearTimeout(state.previewIdleTimer); state.previewIdleTimer = null; }
   }
 
-  global.DragController = {
-    create
+  function stopDragPreviewTimer() {
+    if (state.dragPreviewTimer) { clearInterval(state.dragPreviewTimer); state.dragPreviewTimer = null; }
+  }
+
+  function resetDragSession() {
+    state.dragCtx = null;
+    state.hoverPreview = null;
+    state.lastDragPoint = null;
+    state.hoverAnchorPoint = null;
+    stopDragPreviewTimer();
+    stopPreviewIdleTimer();
+  }
+
+  function handlePreviewModeDragOver(x, y, onMovedBeyondThreshold) {
+    const point = { x, y };
+    const dist = state.hoverAnchorPoint
+      ? Math.hypot(state.hoverAnchorPoint.x - x, state.hoverAnchorPoint.y - y)
+      : Infinity;
+    if (!state.hoverAnchorPoint || dist > previewMoveThresholdPx) {
+      state.hoverAnchorPoint = point;
+      onMovedBeyondThreshold(point);
+    }
+  }
+
+  return {
+    get dragCtx() { return state.dragCtx; },
+    set dragCtx(v) { state.dragCtx = v; },
+    get hoverPreview() { return state.hoverPreview; },
+    set hoverPreview(v) { state.hoverPreview = v; },
+    get lastDragPoint() { return state.lastDragPoint; },
+    set lastDragPoint(v) { state.lastDragPoint = v; },
+    set hoverAnchorPoint(v) { state.hoverAnchorPoint = v; },
+
+    stopPreviewIdleTimer,
+    stopDragPreviewTimer,
+
+    schedulePreviewIdle(callback, idleMs) {
+      stopPreviewIdleTimer();
+      state.previewIdleTimer = setTimeout(callback, idleMs);
+    },
+
+    startDragPreviewTimer(callback, intervalMs) {
+      stopDragPreviewTimer();
+      state.dragPreviewTimer = setInterval(callback, intervalMs);
+    },
+
+    handlePreviewModeDragOver,
+    resetDragSession,
+    hasTransientState() { return !!(state.dragCtx || state.hoverPreview); }
   };
-})(window);
+}

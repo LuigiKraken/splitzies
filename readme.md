@@ -1,5 +1,35 @@
 # Tab Drag-and-Drop Split Zone Pattern
 
+## Running the Demo
+
+This is a vanilla JavaScript app using ES modules. No build step required.
+
+**Local testing:**
+
+```bash
+# Option 1: Python (built-in on Mac/Linux, usually on Windows)
+python -m http.server 8000
+
+# Option 2: Node.js
+npx http-server -p 8080
+
+# Then open: http://localhost:8000 (or :8080)
+```
+
+**Deployment:**
+
+Since this is static HTML/CSS/JS with no dependencies, you can deploy it anywhere:
+
+- **GitHub Pages**: Push to GitHub, enable Pages in repo settings, done.
+- **Netlify/Vercel**: Drag the folder into their web UI or connect the repo.
+- **Any static host**: Upload the files to any web server.
+
+ES modules require an HTTP server (they don't work with `file://` protocol). Any server works -- even the simplest one.
+
+---
+
+## Algorithm Overview
+
 At its core, dropping a tab does one of three things:
 
 1. **Stack** — add it to an existing panel as a browser-style tab. No layout change.
