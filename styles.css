@@ -55,7 +55,7 @@ html, body {
   background: #f8fafc;
   box-shadow: inset 0 1px 0 #fff;
 }
-.workspace.previewing > .workspace-tree { opacity: 0; }
+/* During preview: current layout stays solid; preview overlay is transparent + distinct tone */
 .node {
   position: relative;
   min-width: var(--min-box-width-px, 70px);
@@ -275,10 +275,40 @@ html, body {
   opacity: 0;
   transition: opacity 120ms linear;
 }
-.workspace-preview.active { opacity: 1; }
+.workspace-preview.active {
+  opacity: 1;
+}
 .workspace-preview.combined-tone {
-  filter: saturate(0.72) brightness(1.04);
-  opacity: 0.88;
+  opacity: 1;
+}
+/* Outline-only preview: dashed borders show where the new layout will go */
+.workspace-preview.active .panel,
+.workspace-preview.combined-tone .panel {
+  background: transparent !important;
+  border: 2px dashed #22c55e;
+  box-shadow: none;
+}
+.workspace-preview.active .tabs,
+.workspace-preview.combined-tone .tabs {
+  background: transparent !important;
+  border-bottom-color: rgba(34, 197, 94, 0.5);
+}
+.workspace-preview.active .tab,
+.workspace-preview.combined-tone .tab {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.6);
+  color: #16a34a;
+}
+.workspace-preview.active .panel-meta,
+.workspace-preview.combined-tone .panel-meta {
+  background: transparent !important;
+  border-top-color: rgba(34, 197, 94, 0.4);
+  color: #16a34a;
+}
+.workspace-preview.active .panel-number,
+.workspace-preview.combined-tone .panel-number {
+  color: rgba(34, 197, 94, 0.9);
+  font-weight: 600;
 }
 .workspace-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 70; transition: opacity 120ms linear; }
 .workspace-overlay.faded { opacity: 0.3; }
@@ -396,4 +426,27 @@ html[data-theme="dark"] .create-drag-ghost {
   background: rgba(15, 23, 42, 0.96);
   color: #e2e8f0;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="dark"] .workspace-preview.active .panel,
+html[data-theme="dark"] .workspace-preview.combined-tone .panel {
+  border-color: #4ade80;
+}
+html[data-theme="dark"] .workspace-preview.active .tabs,
+html[data-theme="dark"] .workspace-preview.combined-tone .tabs {
+  border-bottom-color: rgba(74, 222, 128, 0.5);
+}
+html[data-theme="dark"] .workspace-preview.active .tab,
+html[data-theme="dark"] .workspace-preview.combined-tone .tab {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #4ade80;
+}
+html[data-theme="dark"] .workspace-preview.active .panel-meta,
+html[data-theme="dark"] .workspace-preview.combined-tone .panel-meta {
+  border-top-color: rgba(74, 222, 128, 0.4);
+  color: #4ade80;
+}
+html[data-theme="dark"] .workspace-preview.active .panel-number,
+html[data-theme="dark"] .workspace-preview.combined-tone .panel-number {
+  color: #4ade80;
 }
