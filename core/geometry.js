@@ -108,6 +108,56 @@ export function getDisplayDirectionalBandPolygon(bounds, layer, totalLayers, dir
   return getDirectionalBandPolygonByRatio(bounds, direction, safeStart + (layer - 1) * ring, safeStart + layer * ring);
 }
 
+/**
+ * Returns a full-width/height rectangle for the outermost directional band.
+ * Used instead of trapezoids at panel edges to avoid triangular dead zones
+ * when a large panel sits next to two smaller ones.
+ */
+export function getDisplayDirectionalEdgeRect(bounds, totalLayers, direction, startRatio) {
+  if (totalLayers < 1) return null;
+  const safeStart = clamp(startRatio, 0, 0.95);
+  const ring = (1 - safeStart) / totalLayers;
+  const inner = safeStart + (totalLayers - 1) * ring;
+  const cx = bounds.left + bounds.width / 2;
+  const cy = bounds.top + bounds.height / 2;
+  const halfW = bounds.width / 2;
+  const halfH = bounds.height / 2;
+
+  if (direction === "TOP") {
+    return {
+      left: bounds.left,
+      top: bounds.top,
+      width: bounds.width,
+      height: halfH * (1 - inner)
+    };
+  }
+  if (direction === "BOTTOM") {
+    return {
+      left: bounds.left,
+      top: cy + inner * halfH,
+      width: bounds.width,
+      height: halfH * (1 - inner)
+    };
+  }
+  if (direction === "LEFT") {
+    return {
+      left: bounds.left,
+      top: bounds.top,
+      width: halfW * (1 - inner),
+      height: bounds.height
+    };
+  }
+  if (direction === "RIGHT") {
+    return {
+      left: cx + inner * halfW,
+      top: bounds.top,
+      width: halfW * (1 - inner),
+      height: bounds.height
+    };
+  }
+  return null;
+}
+
 export function polygonToClipPath(bounds, poly) {
   if (!poly || poly.length < 3 || bounds.width <= 0 || bounds.height <= 0) return "";
   return `polygon(${poly.map((p) =>

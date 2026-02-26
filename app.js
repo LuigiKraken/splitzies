@@ -137,7 +137,9 @@ function renderAndPersistWithDropTransition(previousRects, enteredPanelId = null
 
 function capturePanelRects() {
   const map = new Map();
-  for (const el of workspaceEl.querySelectorAll(".panel[data-panel-id]")) {
+  const workspaceTree = workspaceEl.querySelector(".workspace-tree");
+  if (!workspaceTree) return map;
+  for (const el of workspaceTree.querySelectorAll(".panel[data-panel-id]")) {
     const r = el.getBoundingClientRect();
     map.set(el.dataset.panelId, { left: r.left, top: r.top, width: r.width, height: r.height });
   }

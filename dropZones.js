@@ -2,7 +2,7 @@ import { axisForDirection, isAlongAxis, isBeforeDirection, findNodeById } from "
 import {
   clamp, pointInRect, pointInPolygon,
   getCenterRect, getEffectiveLayerCount,
-  getDisplayDirectionalBandPolygon, polygonToClipPath
+  getDisplayDirectionalBandPolygon, getDisplayDirectionalEdgeRect, polygonToClipPath
 } from "./core/geometry.js";
 
 const OUTCOME_PALETTE = [
@@ -173,14 +173,40 @@ export function createDropZones(config, workspaceEl, { canAddSiblingToAxis, getR
     for (const direction of ["TOP", "BOTTOM", "LEFT", "RIGHT"]) {
       const reachable = getReachableLayerCount(info, totalLayers, direction);
       for (let layer = 1; layer <= reachable; layer++) {
-        const poly = getDisplayDirectionalBandPolygon(bounds, layer, reachable, direction, startRatio);
-        if (!poly || poly.length < 3) continue;
-        descriptors.push({
-          key: `display-layer-${layer}-${direction}`, layer, direction,
-          geometry: { kind: "polygon", bounds, points: poly, clipPath: polygonToClipPath(bounds, poly) },
-          zone: resolveDirectionalZone(info, panelBounds, layer, direction),
-          hit: (x, y) => pointInPolygon(x, y, poly)
-        });
+        const isOuterEdge = layer === reachable;
+        if (isOuterEdge) {
+          let edgeRect = getDisplayDirectionalEdgeRect(bounds, reachable, direction, startRatio);
+          if (!edgeRect || edgeRect.width <= 0 || edgeRect.height <= 0) continue;
+          const containerEl = panelEl.closest(".container[data-node-id]");
+          if (containerEl && info.parent) {
+            const containerBounds = containerEl.getBoundingClientRect();
+            const atEdge = 2;
+            if (direction === "BOTTOM" && panelBounds.bottom >= containerBounds.bottom - atEdge) {
+              edgeRect = { ...edgeRect, left: containerBounds.left, width: containerBounds.width };
+            } else if (direction === "TOP" && panelBounds.top <= containerBounds.top + atEdge) {
+              edgeRect = { ...edgeRect, left: containerBounds.left, width: containerBounds.width };
+            } else if (direction === "LEFT" && panelBounds.left <= containerBounds.left + atEdge) {
+              edgeRect = { ...edgeRect, top: containerBounds.top, height: containerBounds.height };
+            } else if (direction === "RIGHT" && panelBounds.right >= containerBounds.right - atEdge) {
+              edgeRect = { ...edgeRect, top: containerBounds.top, height: containerBounds.height };
+            }
+          }
+          descriptors.push({
+            key: `display-layer-${layer}-${direction}`, layer, direction,
+            geometry: { kind: "rect", bounds: edgeRect },
+            zone: resolveDirectionalZone(info, panelBounds, layer, direction),
+            hit: (x, y) => pointInRect(x, y, edgeRect)
+          });
+        } else {
+          const poly = getDisplayDirectionalBandPolygon(bounds, layer, reachable, direction, startRatio);
+          if (!poly || poly.length < 3) continue;
+          descriptors.push({
+            key: `display-layer-${layer}-${direction}`, layer, direction,
+            geometry: { kind: "polygon", bounds, points: poly, clipPath: polygonToClipPath(bounds, poly) },
+            zone: resolveDirectionalZone(info, panelBounds, layer, direction),
+            hit: (x, y) => pointInPolygon(x, y, poly)
+          });
+        }
       }
     }
 
