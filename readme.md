@@ -25,7 +25,7 @@ At its core, dropping a tab does one of four things:
 | **EQUALIZE** | Insert a new sibling into a row/column; all children reset to equal size |
 | **WRAP**     | Nest an existing container in a new perpendicular split |
 
-The demo offers three interaction modes: **Hitbox** (shows all drop zones while dragging — best for understanding the zone system), **Preview** (zones hidden while moving, live preview appears on pause), and **Combined** (both). Hitbox is the default.
+The demo offers three interaction modes: **Hitbox** (shows all drop zones — best for understanding the zone system), **Preview** (zones hidden while moving, live preview appears on hover), and **Combined** (both). Preview is the default.
 
 ---
 
@@ -44,8 +44,6 @@ npx http-server -p 8080
 ```
 
 ES modules require an HTTP server (`file://` won't work). Any server works.
-
-**Deploying:** Since this is static HTML/CSS/JS, you can deploy anywhere — GitHub Pages, Netlify, Vercel, or any static host. A GitHub Actions workflow is included at [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml).
 
 ---
 
